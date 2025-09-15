@@ -1,4 +1,5 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
@@ -8,15 +9,6 @@ use crate::DictKey;
 pub struct OptionalDict<K, V> {
     inner: Vec<Option<V>>,
     phantom: PhantomData<K>,
-}
-
-impl<K, V> Default for OptionalDict<K, V> {
-    fn default() -> Self {
-        Self {
-            inner: Default::default(),
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl<K, V> OptionalDict<K, V> {
@@ -34,12 +26,61 @@ impl<K, V> OptionalDict<K, V> {
     }
 }
 
+impl<K, V> Default for OptionalDict<K, V> {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<K, V: Clone> Clone for OptionalDict<K, V> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
             phantom: PhantomData,
         }
+    }
+}
+
+impl<K, V: PartialEq> PartialEq for OptionalDict<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<K, V: Eq> Eq for OptionalDict<K, V> {}
+
+impl<K, V: PartialOrd> PartialOrd for OptionalDict<K, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.inner.partial_cmp(&other.inner)
+    }
+}
+
+impl<K, V: Ord> Ord for OptionalDict<K, V> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.inner.cmp(&other.inner)
+    }
+}
+
+impl<K, V: Hash> Hash for OptionalDict<K, V> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+    }
+}
+
+impl<K: DictKey, V> Index<K> for OptionalDict<K, V> {
+    type Output = Option<V>;
+
+    fn index(&self, key: K) -> &Self::Output {
+        &self.inner[key.into_usize()]
+    }
+}
+
+impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
+    fn index_mut(&mut self, key: K) -> &mut Self::Output {
+        &mut self.inner[key.into_usize()]
     }
 }
 
@@ -56,23 +97,21 @@ impl<K: DictKey, V: Debug> Debug for OptionalDict<K, V> {
     }
 }
 
-impl<K, V: PartialEq> PartialEq for OptionalDict<K, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner
-    }
-}
-
-impl<K: DictKey, V> Index<K> for OptionalDict<K, V> {
-    type Output = Option<V>;
-
-    fn index(&self, key: K) -> &Self::Output {
-        &self.inner[key.into_usize()]
-    }
-}
-
-impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
-    fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        &mut self.inner[key.into_usize()]
+impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+        let mut is_first = true;
+        for (index, value) in self.inner.iter().enumerate() {
+            let Some(value) = value else {
+                continue;
+            };
+            if is_first {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {}", K::FIELDS[index], value)?;
+            is_first = false;
+        }
+        write!(f, "}}")
     }
 }
 

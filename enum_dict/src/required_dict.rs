@@ -1,4 +1,5 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
@@ -20,12 +21,61 @@ impl<K, V> RequiredDict<K, V> {
     }
 }
 
+impl<K: DictKey, V: Default> Default for RequiredDict<K, V> {
+    fn default() -> Self {
+        Self {
+            inner: K::FIELDS.iter().map(|_| V::default()).collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<K, V: Clone> Clone for RequiredDict<K, V> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
             phantom: PhantomData,
         }
+    }
+}
+
+impl<K, V: PartialEq> PartialEq for RequiredDict<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<K, V: Eq> Eq for RequiredDict<K, V> {}
+
+impl<K, V: PartialOrd> PartialOrd for RequiredDict<K, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.inner.partial_cmp(&other.inner)
+    }
+}
+
+impl<K, V: Ord> Ord for RequiredDict<K, V> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.inner.cmp(&other.inner)
+    }
+}
+
+impl<K, V: Hash> Hash for RequiredDict<K, V> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+    }
+}
+
+impl<K: DictKey, V> Index<K> for RequiredDict<K, V> {
+    type Output = V;
+
+    fn index(&self, key: K) -> &Self::Output {
+        &self.inner[key.into_usize()]
+    }
+}
+
+impl<K: DictKey, V> IndexMut<K> for RequiredDict<K, V> {
+    fn index_mut(&mut self, key: K) -> &mut Self::Output {
+        &mut self.inner[key.into_usize()]
     }
 }
 
@@ -42,23 +92,18 @@ impl<K: DictKey, V: Debug> Debug for RequiredDict<K, V> {
     }
 }
 
-impl<K, V: PartialEq> PartialEq for RequiredDict<K, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner
-    }
-}
-
-impl<K: DictKey, V> Index<K> for RequiredDict<K, V> {
-    type Output = V;
-
-    fn index(&self, key: K) -> &Self::Output {
-        &self.inner[key.into_usize()]
-    }
-}
-
-impl<K: DictKey, V> IndexMut<K> for RequiredDict<K, V> {
-    fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        &mut self.inner[key.into_usize()]
+impl<K: DictKey, V: Display> Display for RequiredDict<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+        let mut is_first = true;
+        for (index, value) in self.inner.iter().enumerate() {
+            if is_first {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {}", K::FIELDS[index], value)?;
+            is_first = false;
+        }
+        write!(f, "}}")
     }
 }
 

@@ -18,7 +18,7 @@ impl<K, V> DictVisitor<K, V> {
 
 #[cfg(feature = "serde")]
 mod serde_impl {
-    use core::fmt;
+    use std::fmt;
 
     use serde::Deserialize;
     use serde::de::{MapAccess, Visitor};
