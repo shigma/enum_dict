@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "enum_dict",
+    "enum_dict_derive",
+]
+resolver = "3"
