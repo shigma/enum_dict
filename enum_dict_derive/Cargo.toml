@@ -1,0 +1,16 @@
+[package]
+name = "enum_dict_derive"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Shigma <shigma10826@gmail.com>"]
+description = "Derive macros for enum_dict."
+repository = "https://github.com/shigma/enum_dict"
+documentation = "https://docs.rs/enum_dict_derive"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1.0.40"
+syn = { version = "2.0.106" }

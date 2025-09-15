@@ -9,8 +9,12 @@ repository = "https://github.com/shigma/enum-dict"
 documentation = "https://docs.rs/enum-dict"
 
 [features]
+default = ["derive"]
+derive = ["dep:enum_dict_derive"]
+full = ["derive", "serde"]
 serde = ["dep:serde"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }
+enum_dict_derive = { version = "0.1.0", path = "../enum_dict_derive", optional = true }
 
