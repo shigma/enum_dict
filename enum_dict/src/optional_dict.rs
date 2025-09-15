@@ -75,3 +75,35 @@ impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
         &mut self.inner[key.into_usize()]
     }
 }
+
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use serde::ser::SerializeMap;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::*;
+    use crate::dict_key::DictVisitor;
+
+    impl<K: DictKey, V: Serialize> Serialize for OptionalDict<K, V> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            let mut map = serializer.serialize_map(Some(self.inner.len()))?;
+            for (index, value) in self.inner.iter().enumerate() {
+                if let Some(value) = value {
+                    map.serialize_entry(K::FIELDS[index], value)?;
+                }
+            }
+            map.end()
+        }
+    }
+
+    impl<'de, K: DictKey, V: Deserialize<'de>> Deserialize<'de> for OptionalDict<K, V> {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let vec = deserializer.deserialize_map(DictVisitor::<K, V>::new())?;
+
+            Ok(Self {
+                inner: vec,
+                phantom: PhantomData,
+            })
+        }
+    }
+}

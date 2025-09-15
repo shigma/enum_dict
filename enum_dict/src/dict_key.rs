@@ -1,4 +1,3 @@
-use core::fmt;
 use std::marker::PhantomData;
 
 /// Trait for types that can be used as dictionary keys
@@ -7,4 +6,44 @@ pub trait DictKey: Sized {
 
     /// Convert to usize index
     fn into_usize(self) -> usize;
+}
+
+pub(crate) struct DictVisitor<K, V>(PhantomData<(K, V)>);
+
+impl<K, V> DictVisitor<K, V> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use core::fmt;
+
+    use serde::Deserialize;
+    use serde::de::{MapAccess, Visitor};
+
+    use super::*;
+
+    impl<'de, K: DictKey, V: Deserialize<'de>> Visitor<'de> for DictVisitor<K, V> {
+        type Value = Vec<Option<V>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a map with optional keys")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+            let mut vec = K::FIELDS.iter().map(|_| None).collect::<Vec<_>>();
+            while let Some((key, value)) = map.next_entry::<String, V>()? {
+                // ignore unknown keys
+                for (index, &name) in K::FIELDS.iter().enumerate() {
+                    if name == key {
+                        vec[index] = Some(value);
+                        break;
+                    }
+                }
+            }
+            Ok(vec)
+        }
+    }
 }

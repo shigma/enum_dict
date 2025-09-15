@@ -61,3 +61,47 @@ impl<K: DictKey, V> IndexMut<K> for RequiredDict<K, V> {
         &mut self.inner[key.into_usize()]
     }
 }
+
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use serde::ser::SerializeMap;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::*;
+    use crate::dict_key::DictVisitor;
+
+    impl<K: DictKey, V: Serialize> Serialize for RequiredDict<K, V> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            let mut map = serializer.serialize_map(Some(self.inner.len()))?;
+            for (index, value) in self.inner.iter().enumerate() {
+                map.serialize_entry(K::FIELDS[index], value)?;
+            }
+            map.end()
+        }
+    }
+
+    impl<'de, K: DictKey, V: Deserialize<'de>> Deserialize<'de> for RequiredDict<K, V> {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let vec = deserializer.deserialize_map(DictVisitor::<K, V>::new())?;
+
+            // Check for missing keys
+            let mut missing_keys = Vec::new();
+            for (index, &name) in K::FIELDS.iter().enumerate() {
+                if vec[index].is_none() {
+                    missing_keys.push(name);
+                }
+            }
+            if !missing_keys.is_empty() {
+                return Err(serde::de::Error::custom(format!(
+                    "Missing keys: {}",
+                    missing_keys.join(", ")
+                )));
+            }
+
+            Ok(Self {
+                inner: vec.into_iter().map(Option::unwrap).collect(),
+                phantom: PhantomData,
+            })
+        }
+    }
+}
