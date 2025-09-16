@@ -12,17 +12,6 @@ pub struct RequiredDict<K, V> {
     phantom: PhantomData<K>,
 }
 
-impl<K: DictKey + FromStr<Err: Debug>, V> RequiredDict<K, V> {
-    /// Create a new RequiredDict
-    pub fn new<F: Fn(K) -> V>(f: F) -> Self {
-        Self {
-            // SAFETY: K::FIELDS are all valid keys
-            inner: K::FIELDS.iter().map(|s| f(s.parse().unwrap())).collect(),
-            phantom: PhantomData,
-        }
-    }
-}
-
 impl<K, V> RequiredDict<K, V> {
     pub fn len(&self) -> usize {
         self.inner.len()
@@ -30,6 +19,16 @@ impl<K, V> RequiredDict<K, V> {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl<K: DictKey + FromStr<Err: Debug>, V, F: Fn(K) -> V> From<F> for RequiredDict<K, V> {
+    fn from(f: F) -> Self {
+        Self {
+            // SAFETY: K::FIELDS are all valid keys
+            inner: K::FIELDS.iter().map(|s| f(s.parse().unwrap())).collect(),
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -162,4 +161,13 @@ mod serde_impl {
             })
         }
     }
+}
+
+#[macro_export]
+macro_rules! required_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::RequiredDict::from(|k| {
+            match k { $($key => $value),* }
+        })
+    }};
 }

@@ -16,10 +16,10 @@ enum_dict = { version = "0.1", features = ["full"] }
 
 ## Quick Start
 
-```rs
-use enum_dict::{DictKey, RequiredDict, OptionalDict};
+```rust
+use enum_dict::{DictKey, FromStr, required_dict, optional_dict};
 
-#[derive(DictKey)]
+#[derive(DictKey, FromStr)]
 enum Color {
     Red,
     Green,
@@ -27,24 +27,25 @@ enum Color {
 }
 
 fn main() {
-    // RequiredDict - all keys must have values
-    let mut colors = RequiredDict::new(|color| match color {
+    // `RequiredDict` - all keys must have values
+    let mut colors = required_dict! {
         Color::Red => "#FF0000",
         Color::Green => "#00FF00",
         Color::Blue => "#0000FF",
-    });
+    };
 
-    // Direct indexing - no .get() needed!
+    // Direct indexing - no `.get()` needed!
     println!("Red hex: {}", colors[Color::Red]);
 
     // Mutable access
     colors[Color::Red] = "#FF0001";
 
-    // OptionalDict - keys may or may not have values
-    let mut favorite_colors = OptionalDict::<Color, String>::new();
-    favorite_colors.set(Color::Blue, "Sky Blue".to_string());
+    // `OptionalDict` - keys may or may not have values
+    let favorite_colors = optional_dict! {
+        Color::Blue => "Sky Blue",
+    };
 
-    // Returns Option<&String>
+    // Returns `Option<&str>`
     if let Some(favorite) = favorite_colors[Color::Blue] {
         println!("Favorite blue: {}", favorite);
     }
@@ -55,15 +56,16 @@ fn main() {
 
 With the serde feature enabled, `RequiredDict` and `OptionalDict` can be serialized and deserialized using [serde](https://serde.rs/):
 
-```rs
+```rust
+use enum_dict::{DictKey, RequiredDict};
 use serde::{Serialize, Deserialize};
 
 #[derive(DictKey)]
 enum Locale {
-    En,
-    Fr,
-    Jp,
-    Zh,
+    EN,
+    FR,
+    JP,
+    ZH,
 }
 
 #[derive(Serialize, Deserialize)]

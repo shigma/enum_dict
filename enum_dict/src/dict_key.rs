@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 /// Trait for types that can be used as dictionary keys
-pub trait DictKey: Sized {
+pub trait DictKey {
     const FIELDS: &'static [&'static str];
 
     /// Convert to usize index

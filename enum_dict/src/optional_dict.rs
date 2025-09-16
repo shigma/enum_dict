@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
+use std::str::FromStr;
 
 use crate::DictKey;
 
@@ -23,6 +24,16 @@ impl<K, V> OptionalDict<K, V> {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl<K: DictKey + FromStr<Err: Debug>, V, F: Fn(K) -> Option<V>> From<F> for OptionalDict<K, V> {
+    fn from(f: F) -> Self {
+        Self {
+            // SAFETY: K::FIELDS are all valid keys
+            inner: K::FIELDS.iter().map(|s| f(s.parse().unwrap())).collect(),
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -145,4 +156,16 @@ mod serde_impl {
             })
         }
     }
+}
+
+#[macro_export]
+macro_rules! optional_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::OptionalDict::from(|k| {
+            match k {
+                $($key => Some($value)),* ,
+                _ => None,
+            }
+        })
+    }};
 }
