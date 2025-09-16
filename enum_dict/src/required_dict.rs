@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
+use std::str::FromStr;
 
 use crate::DictKey;
 
@@ -11,11 +12,12 @@ pub struct RequiredDict<K, V> {
     phantom: PhantomData<K>,
 }
 
-impl<K: DictKey, V> RequiredDict<K, V> {
+impl<K: DictKey + FromStr<Err: Debug>, V> RequiredDict<K, V> {
     /// Create a new RequiredDict
-    pub fn new<F: Fn() -> V>(f: F) -> Self {
+    pub fn new<F: Fn(K) -> V>(f: F) -> Self {
         Self {
-            inner: K::FIELDS.iter().map(|_| f()).collect(),
+            // SAFETY: K::FIELDS are all valid keys
+            inner: K::FIELDS.iter().map(|s| f(s.parse().unwrap())).collect(),
             phantom: PhantomData,
         }
     }
@@ -140,7 +142,7 @@ mod serde_impl {
             let vec = deserializer.deserialize_map(DictVisitor::<K, V>::new())?;
 
             // Check for missing keys
-            let mut missing_keys = Vec::new();
+            let mut missing_keys = vec![];
             for (index, &name) in K::FIELDS.iter().enumerate() {
                 if vec[index].is_none() {
                     missing_keys.push(name);
@@ -154,6 +156,7 @@ mod serde_impl {
             }
 
             Ok(Self {
+                // SAFETY: checked for missing keys above
                 inner: vec.into_iter().map(Option::unwrap).collect(),
                 phantom: PhantomData,
             })
