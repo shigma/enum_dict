@@ -11,6 +11,16 @@ pub struct RequiredDict<K, V> {
     phantom: PhantomData<K>,
 }
 
+impl<K: DictKey, V> RequiredDict<K, V> {
+    /// Create a new RequiredDict
+    pub fn new<F: Fn() -> V>(f: F) -> Self {
+        Self {
+            inner: K::FIELDS.iter().map(|_| f()).collect(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<K, V> RequiredDict<K, V> {
     pub fn len(&self) -> usize {
         self.inner.len()

@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 mod dict_key;
 mod optional_dict;
 mod required_dict;

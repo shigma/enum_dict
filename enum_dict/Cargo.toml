@@ -1,10 +1,10 @@
 [package]
 name = "enum_dict"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 authors = ["Shigma <shigma10826@gmail.com>"]
-description = "Enum-indexed dictionaries."
+description = "Efficient enum-indexed dictionaries."
 repository = "https://github.com/shigma/enum-dict"
 documentation = "https://docs.rs/enum-dict"
 
@@ -16,7 +16,7 @@ serde = ["dep:serde"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }
-enum_dict_derive = { version = "0.1.0", path = "../enum_dict_derive", optional = true }
+enum_dict_derive = { version = "0.1.1", path = "../enum_dict_derive", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
