@@ -27,10 +27,15 @@ impl<K, V> OptionalDict<K, V> {
     }
 }
 
-impl<K: DictKey + FromStr<Err: Debug>, V, F: Fn(K) -> Option<V>> From<F> for OptionalDict<K, V> {
+impl<K, V, F> From<F> for OptionalDict<K, V>
+where
+    K: DictKey + FromStr,
+    K::Err: Debug,
+    F: Fn(K) -> Option<V>,
+{
     fn from(f: F) -> Self {
         Self {
-            // SAFETY: K::FIELDS are all valid keys
+            // SAFETY: K::VARIANTS are all valid keys
             inner: K::VARIANTS.iter().map(|s| f(s.parse().unwrap())).collect(),
             phantom: PhantomData,
         }

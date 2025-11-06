@@ -1,95 +1,93 @@
 #![doc = include_str!("../README.md")]
 
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields, LitStr, parse_macro_input};
 
 #[proc_macro_derive(DictKey)]
 pub fn derive_dict_key(input: TokenStream) -> TokenStream {
-    let input: DeriveInput = parse_macro_input!(input);
-    let ident = &input.ident;
+    derive_dict_key_inner(input.into()).into()
+}
 
-    let mut ident_names = vec![];
+pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
+    let input: syn::DeriveInput = match syn::parse2(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
+    let syn::Data::Enum(data) = &input.data else {
+        return syn::Error::new(input.span(), "DictKey can only be derived for enums").to_compile_error();
+    };
 
-    match &input.data {
-        Data::Enum(data) => {
-            for variant in &data.variants {
-                let ident = &variant.ident;
-                let name = LitStr::new(&ident.to_string(), ident.span());
-                ident_names.push(quote! { #name });
+    let mut ident_names = TokenStream2::new();
+    let mut errors = TokenStream2::new();
+    for variant in &data.variants {
+        let name = variant.ident.to_string();
+        ident_names.extend(quote! { #name, });
 
-                match &variant.fields {
-                    Fields::Unit => {}
-                    _ => {
-                        return Error::new(variant.span(), "DictKey can only be derived for unit variants")
-                            .to_compile_error()
-                            .into();
-                    }
-                }
-            }
-        }
-        _ => {
-            return Error::new(input.span(), "DictKey can only be derived for enums")
-                .to_compile_error()
-                .into();
-        }
+        let syn::Fields::Unit = &variant.fields else {
+            errors.extend(
+                syn::Error::new(variant.span(), "DictKey can only be derived for unit variants").to_compile_error(),
+            );
+            continue;
+        };
+    }
+    if !errors.is_empty() {
+        return errors;
     }
 
+    let ident = &input.ident;
     quote! {
+        #[automatically_derived]
         impl DictKey for #ident {
-            const VARIANTS: &'static [&'static str] = &[#(#ident_names),*];
-
+            const VARIANTS: &'static [&'static str] = &[#ident_names];
             fn into_usize(self) -> usize {
                 self as usize
             }
         }
     }
-    .into()
 }
 
 #[proc_macro_derive(FromStr)]
 pub fn derive_from_str(input: TokenStream) -> TokenStream {
-    let input: DeriveInput = parse_macro_input!(input);
-    let ident = &input.ident;
+    derive_from_str_inner(input.into()).into()
+}
 
-    let mut match_arms = vec![];
+pub(crate) fn derive_from_str_inner(input: TokenStream2) -> TokenStream2 {
+    let input: syn::DeriveInput = match syn::parse2(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error(),
+    };
+    let syn::Data::Enum(data) = &input.data else {
+        return syn::Error::new(input.span(), "FromStr can only be derived for enums").to_compile_error();
+    };
 
-    match &input.data {
-        Data::Enum(data) => {
-            for variant in &data.variants {
-                let ident = &variant.ident;
-                let name = LitStr::new(&ident.to_string(), ident.span());
-                match_arms.push(quote! { #name => Ok(Self::#ident), });
+    let mut match_arms = TokenStream2::new();
+    let mut errors = TokenStream2::new();
+    for variant in &data.variants {
+        let ident = &variant.ident;
+        let name = variant.ident.to_string();
+        match_arms.extend(quote! { #name => Ok(Self::#ident), });
 
-                match &variant.fields {
-                    Fields::Unit => {}
-                    _ => {
-                        return Error::new(variant.span(), "FromStr can only be derived for unit variants")
-                            .to_compile_error()
-                            .into();
-                    }
-                }
-            }
-        }
-        _ => {
-            return Error::new(input.span(), "FromStr can only be derived for enums")
-                .to_compile_error()
-                .into();
-        }
+        let syn::Fields::Unit = &variant.fields else {
+            errors.extend(
+                syn::Error::new(variant.span(), "FromStr can only be derived for unit variants").to_compile_error(),
+            );
+            continue;
+        };
     }
 
+    let ident = &input.ident;
     quote! {
+        #[automatically_derived]
         impl FromStr for #ident {
             type Err = ();
-
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
-                    #(#match_arms)*
+                    #match_arms
                     _ => Err(()),
                 }
             }
         }
     }
-    .into()
 }

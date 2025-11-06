@@ -8,7 +8,7 @@ pub trait DictKey {
     fn into_usize(self) -> usize;
 }
 
-pub(crate) struct DictVisitor<K, V>(PhantomData<(K, V)>);
+pub struct DictVisitor<K, V>(PhantomData<(K, V)>);
 
 impl<K, V> DictVisitor<K, V> {
     pub fn new() -> Self {

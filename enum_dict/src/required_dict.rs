@@ -22,7 +22,12 @@ impl<K, V> RequiredDict<K, V> {
     }
 }
 
-impl<K: DictKey + FromStr<Err: Debug>, V, F: Fn(K) -> V> From<F> for RequiredDict<K, V> {
+impl<K, V, F> From<F> for RequiredDict<K, V>
+where
+    K: DictKey + FromStr,
+    K::Err: Debug,
+    F: Fn(K) -> V,
+{
     fn from(f: F) -> Self {
         Self {
             // SAFETY: K::VARIANTS are all valid keys
