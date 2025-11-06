@@ -31,7 +31,7 @@ impl<K: DictKey + FromStr<Err: Debug>, V, F: Fn(K) -> Option<V>> From<F> for Opt
     fn from(f: F) -> Self {
         Self {
             // SAFETY: K::FIELDS are all valid keys
-            inner: K::FIELDS.iter().map(|s| f(s.parse().unwrap())).collect(),
+            inner: K::VARIANTS.iter().map(|s| f(s.parse().unwrap())).collect(),
             phantom: PhantomData,
         }
     }
@@ -102,7 +102,7 @@ impl<K: DictKey, V: Debug> Debug for OptionalDict<K, V> {
                 self.inner
                     .iter()
                     .enumerate()
-                    .filter_map(|(index, value)| value.as_ref().map(|value| (K::FIELDS[index], value))),
+                    .filter_map(|(index, value)| value.as_ref().map(|value| (K::VARIANTS[index], value))),
             )
             .finish()
     }
@@ -119,7 +119,7 @@ impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
             if is_first {
                 write!(f, ", ")?;
             }
-            write!(f, "{}: {}", K::FIELDS[index], value)?;
+            write!(f, "{}: {}", K::VARIANTS[index], value)?;
             is_first = false;
         }
         write!(f, "}}")
@@ -139,7 +139,7 @@ mod serde_impl {
             let mut map = serializer.serialize_map(Some(self.inner.len()))?;
             for (index, value) in self.inner.iter().enumerate() {
                 if let Some(value) = value {
-                    map.serialize_entry(K::FIELDS[index], value)?;
+                    map.serialize_entry(K::VARIANTS[index], value)?;
                 }
             }
             map.end()

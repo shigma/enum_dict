@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 /// Trait for types that can be used as dictionary keys
 pub trait DictKey {
-    const FIELDS: &'static [&'static str];
+    const VARIANTS: &'static [&'static str];
 
     /// Convert to usize index
     fn into_usize(self) -> usize;
@@ -33,10 +33,10 @@ mod serde_impl {
         }
 
         fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-            let mut vec = K::FIELDS.iter().map(|_| None).collect::<Vec<_>>();
+            let mut vec = K::VARIANTS.iter().map(|_| None).collect::<Vec<_>>();
             while let Some((key, value)) = map.next_entry::<String, V>()? {
                 // ignore unknown keys
-                for (index, &name) in K::FIELDS.iter().enumerate() {
+                for (index, &name) in K::VARIANTS.iter().enumerate() {
                     if name == key {
                         vec[index] = Some(value);
                         break;

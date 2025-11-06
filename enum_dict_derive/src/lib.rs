@@ -38,7 +38,7 @@ pub fn derive_dict_key(input: TokenStream) -> TokenStream {
 
     quote! {
         impl DictKey for #ident {
-            const FIELDS: &'static [&'static str] = &[#(#ident_names),*];
+            const VARIANTS: &'static [&'static str] = &[#(#ident_names),*];
 
             fn into_usize(self) -> usize {
                 self as usize

@@ -25,8 +25,8 @@ impl<K, V> RequiredDict<K, V> {
 impl<K: DictKey + FromStr<Err: Debug>, V, F: Fn(K) -> V> From<F> for RequiredDict<K, V> {
     fn from(f: F) -> Self {
         Self {
-            // SAFETY: K::FIELDS are all valid keys
-            inner: K::FIELDS.iter().map(|s| f(s.parse().unwrap())).collect(),
+            // SAFETY: K::VARIANTS are all valid keys
+            inner: K::VARIANTS.iter().map(|s| f(s.parse().unwrap())).collect(),
             phantom: PhantomData,
         }
     }
@@ -35,7 +35,7 @@ impl<K: DictKey + FromStr<Err: Debug>, V, F: Fn(K) -> V> From<F> for RequiredDic
 impl<K: DictKey, V: Default> Default for RequiredDict<K, V> {
     fn default() -> Self {
         Self {
-            inner: K::FIELDS.iter().map(|_| V::default()).collect(),
+            inner: K::VARIANTS.iter().map(|_| V::default()).collect(),
             phantom: PhantomData,
         }
     }
@@ -97,7 +97,7 @@ impl<K: DictKey, V: Debug> Debug for RequiredDict<K, V> {
                 self.inner
                     .iter()
                     .enumerate()
-                    .map(|(index, value)| (K::FIELDS[index], value)),
+                    .map(|(index, value)| (K::VARIANTS[index], value)),
             )
             .finish()
     }
@@ -111,7 +111,7 @@ impl<K: DictKey, V: Display> Display for RequiredDict<K, V> {
             if is_first {
                 write!(f, ", ")?;
             }
-            write!(f, "{}: {}", K::FIELDS[index], value)?;
+            write!(f, "{}: {}", K::VARIANTS[index], value)?;
             is_first = false;
         }
         write!(f, "}}")
@@ -130,7 +130,7 @@ mod serde_impl {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             let mut map = serializer.serialize_map(Some(self.inner.len()))?;
             for (index, value) in self.inner.iter().enumerate() {
-                map.serialize_entry(K::FIELDS[index], value)?;
+                map.serialize_entry(K::VARIANTS[index], value)?;
             }
             map.end()
         }
@@ -142,7 +142,7 @@ mod serde_impl {
 
             // Check for missing keys
             let mut missing_keys = vec![];
-            for (index, &name) in K::FIELDS.iter().enumerate() {
+            for (index, &name) in K::VARIANTS.iter().enumerate() {
                 if vec[index].is_none() {
                     missing_keys.push(name);
                 }
