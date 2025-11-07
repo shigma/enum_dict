@@ -97,7 +97,8 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
             continue;
         };
 
-        let mut rename = rename_all;
+        let ident = &variant.ident;
+        let mut name = rename_all.apply(&ident.to_string());
         for attr in variant.attrs {
             if !attr.path().is_ident("enum_dict") {
                 continue;
@@ -127,10 +128,7 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
                             .extend(syn::Error::new(arg.ident.span(), "expected rename = \"...\"").to_compile_error());
                         continue;
                     };
-                    match RenameRule::from_str(&lit_str.value()) {
-                        Ok(rule) => rename = rule,
-                        Err(err) => errors.extend(syn::Error::new(lit_str.span(), err.to_string()).to_compile_error()),
-                    };
+                    name = lit_str.value();
                 } else {
                     errors.extend(
                         syn::Error::new(arg.ident.span(), "unknown attribute for enum_dict derive").to_compile_error(),
@@ -139,8 +137,6 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
             }
         }
 
-        let ident = &variant.ident;
-        let name = rename.apply(&ident.to_string());
         match_arms.extend(quote! { #name => Ok(Self::#ident), });
         ident_names.extend(quote! { #name, });
     }
