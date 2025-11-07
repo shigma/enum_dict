@@ -17,9 +17,9 @@ enum_dict = { version = "0.1", features = ["full"] }
 ## Quick Start
 
 ```rust
-use enum_dict::{DictKey, FromStr, required_dict, optional_dict};
+use enum_dict::{DictKey, required_dict, optional_dict};
 
-#[derive(DictKey, FromStr)]
+#[derive(DictKey)]
 enum Color {
     Red,
     Green,

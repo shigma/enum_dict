@@ -5,10 +5,10 @@ pub trait DictKey {
     const VARIANTS: &'static [&'static str];
 
     /// Convert to usize index
-    fn into_usize(self) -> usize;
+    fn variant_index(self) -> usize;
 }
 
-pub struct DictVisitor<K, V>(PhantomData<(K, V)>);
+pub(crate) struct DictVisitor<K, V>(PhantomData<(K, V)>);
 
 impl<K, V> DictVisitor<K, V> {
     pub fn new() -> Self {

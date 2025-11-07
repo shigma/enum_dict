@@ -1,7 +1,7 @@
-use enum_dict::{DictKey, FromStr, OptionalDict, RequiredDict};
+use enum_dict::{DictKey, OptionalDict, RequiredDict};
 use serde::{Deserialize, Serialize};
 
-#[derive(DictKey, FromStr)]
+#[derive(DictKey)]
 enum Key {
     A,
     B,

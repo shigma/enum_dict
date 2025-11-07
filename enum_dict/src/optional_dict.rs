@@ -90,13 +90,13 @@ impl<K: DictKey, V> Index<K> for OptionalDict<K, V> {
     type Output = Option<V>;
 
     fn index(&self, key: K) -> &Self::Output {
-        &self.inner[key.into_usize()]
+        &self.inner[key.variant_index()]
     }
 }
 
 impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        &mut self.inner[key.into_usize()]
+        &mut self.inner[key.variant_index()]
     }
 }
 
