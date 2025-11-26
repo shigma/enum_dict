@@ -12,12 +12,17 @@ pub struct OptionalDict<K, V> {
     phantom: PhantomData<K>,
 }
 
-impl<K, V> OptionalDict<K, V> {
+impl<K, V> OptionalDict<K, V>
+where
+    K: DictKey,
+{
     /// Create a new empty OptionalDict
     pub fn new() -> Self {
         Default::default()
     }
+}
 
+impl<K, V> OptionalDict<K, V> {
     pub fn len(&self) -> usize {
         self.inner.iter().filter(|&v| v.is_some()).count()
     }
@@ -42,10 +47,13 @@ where
     }
 }
 
-impl<K, V> Default for OptionalDict<K, V> {
+impl<K, V> Default for OptionalDict<K, V>
+where
+    K: DictKey,
+{
     fn default() -> Self {
         Self {
-            inner: Default::default(),
+            inner: K::VARIANTS.iter().map(|_| None).collect(),
             phantom: PhantomData,
         }
     }
