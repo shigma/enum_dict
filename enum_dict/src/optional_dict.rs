@@ -125,6 +125,10 @@ impl<K: DictKey, V: Clone> Clone for OptionalDict<K, V> {
     }
 }
 
+// Actually, `K::Array<Option<V>>: Copy` always holds when `V: Copy`
+// (because `K::Array<Option<V>>` is an array), but Rust currently cannot recognize it.
+impl<K: DictKey, V: Copy> Copy for OptionalDict<K, V> where K::Array<Option<V>>: Copy {}
+
 impl<K: DictKey, V: PartialEq> PartialEq for OptionalDict<K, V> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {

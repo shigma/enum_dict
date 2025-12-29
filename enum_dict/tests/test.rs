@@ -2,6 +2,7 @@ use enum_dict::{DictKey, OptionalDict, RequiredDict};
 use serde::{Deserialize, Serialize};
 
 #[derive(DictKey)]
+#[enum_dict(rename_all = "lowercase")]
 enum Key {
     A,
     B,
@@ -17,12 +18,12 @@ struct Data {
 fn test_serde() {
     let json = r#"{
         "required": {
-            "A": 1,
-            "B": 2
+            "a": 1,
+            "b": 2
         },
         "optional": {
-            "A": 3,
-            "X": 4
+            "a": 3,
+            "B": 4
         }
     }"#;
 
@@ -37,7 +38,7 @@ fn test_serde() {
 
     assert_eq!(
         serde_json::to_string(&data).unwrap(),
-        r#"{"required":{"A":1,"B":2},"optional":{"A":3}}"#
+        r#"{"required":{"a":1,"b":2},"optional":{"a":3}}"#
     );
 }
 

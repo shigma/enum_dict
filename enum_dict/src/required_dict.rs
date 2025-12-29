@@ -112,6 +112,10 @@ impl<K: DictKey, V: Clone> Clone for RequiredDict<K, V> {
     }
 }
 
+// Actually, `K::Array<V>: Copy` always holds when `V: Copy`
+// (because `K::Array<V>` is an array), but Rust currently cannot recognize it.
+impl<K: DictKey, V: Copy> Copy for RequiredDict<K, V> where K::Array<V>: Copy {}
+
 impl<K: DictKey, V: PartialEq> PartialEq for RequiredDict<K, V> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
