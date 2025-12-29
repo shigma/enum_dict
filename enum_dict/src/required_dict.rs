@@ -193,7 +193,6 @@ mod serde_impl {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use super::*;
-    use crate::dict_key::DictVisitor;
 
     impl<K: DictKey, V: Serialize> Serialize for RequiredDict<K, V> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -227,8 +226,7 @@ mod serde_impl {
 
     impl<'de, K: DictKey, V: Deserialize<'de>> Deserialize<'de> for RequiredDict<K, V> {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            deserializer
-                .deserialize_map(DictVisitor::<K, V>::new())?
+            OptionalDict::<K, V>::deserialize(deserializer)?
                 .upgrade()
                 .map_err(|dict| serde::de::Error::custom(MissingKeys(dict)))
         }

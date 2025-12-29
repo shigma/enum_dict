@@ -205,11 +205,66 @@ impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
 
 #[cfg(feature = "serde")]
 mod serde_impl {
+    use serde::de::{DeserializeSeed, MapAccess, Visitor};
     use serde::ser::SerializeMap;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use super::*;
-    use crate::dict_key::DictVisitor;
+
+    struct KeyMatcher<K>(PhantomData<K>);
+
+    impl<'de, K: DictKey> DeserializeSeed<'de> for KeyMatcher<K> {
+        type Value = Option<usize>;
+
+        #[inline]
+        fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+            deserializer.deserialize_str(self)
+        }
+    }
+
+    impl<'de, K: DictKey> Visitor<'de> for KeyMatcher<K> {
+        type Value = Option<usize>;
+
+        #[inline]
+        fn expecting(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+            f.write_str("a string key")
+        }
+
+        #[inline]
+        fn visit_str<E: serde::de::Error>(self, str: &str) -> Result<Self::Value, E> {
+            Ok(K::VARIANTS.iter().position(|&name| name == str))
+        }
+    }
+
+    struct DictVisitor<K, V>(PhantomData<(K, V)>);
+
+    impl<K, V> DictVisitor<K, V> {
+        #[inline]
+        fn new() -> Self {
+            Self(PhantomData)
+        }
+    }
+
+    impl<'de, K: DictKey, V: Deserialize<'de>> Visitor<'de> for DictVisitor<K, V> {
+        type Value = OptionalDict<K, V>;
+
+        #[inline]
+        fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+            formatter.write_str("a map with optional keys")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+            let mut dict = OptionalDict::<K, V>::new();
+            while let Some(key) = map.next_key_seed(KeyMatcher(PhantomData::<K>))? {
+                let value = map.next_value()?;
+                // ignore unknown keys
+                if let Some(index) = key {
+                    dict.inner.as_mut()[index] = Some(value);
+                }
+            }
+            Ok(dict)
+        }
+    }
 
     impl<K: DictKey, V: Serialize> Serialize for OptionalDict<K, V> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
