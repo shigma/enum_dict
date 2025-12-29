@@ -4,13 +4,13 @@ use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
-use crate::DictKey;
 use crate::dict_key::Array;
+use crate::{DictKey, RequiredDict};
 
 /// A dictionary where keys may or may not have values
 pub struct OptionalDict<K: DictKey, V> {
-    inner: K::Array<Option<V>>,
-    phantom: PhantomData<K>,
+    pub(crate) inner: K::Array<Option<V>>,
+    pub(crate) phantom: PhantomData<K>,
 }
 
 impl<K: DictKey, V> OptionalDict<K, V> {
@@ -28,6 +28,14 @@ impl<K: DictKey, V> OptionalDict<K, V> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn upgrade(self) -> Option<RequiredDict<K, V>> {
+        let mut iter = self.inner.into_iter();
+        Some(RequiredDict {
+            inner: Array::try_from_fn(|_| iter.next().unwrap().ok_or(())).ok()?,
+            phantom: PhantomData,
+        })
+    }
 }
 
 impl<K, V> OptionalDict<K, V>
@@ -35,9 +43,9 @@ where
     K: DictKey + FromStr,
     K::Err: Debug,
 {
-    pub fn from_fn<F>(f: F) -> Self
+    pub fn from_fn<F>(mut f: F) -> Self
     where
-        F: Fn(K) -> Option<V>,
+        F: FnMut(K) -> Option<V>,
     {
         Self {
             // SAFETY: K::VARIANTS are all valid keys
@@ -46,9 +54,9 @@ where
         }
     }
 
-    pub fn try_from_fn<F, E>(f: F) -> Result<Self, E>
+    pub fn try_from_fn<F, E>(mut f: F) -> Result<Self, E>
     where
-        F: Fn(K) -> Result<Option<V>, E>,
+        F: FnMut(K) -> Result<Option<V>, E>,
     {
         Ok(Self {
             // SAFETY: K::VARIANTS are all valid keys
@@ -191,6 +199,18 @@ macro_rules! optional_dict {
                 $($key => Some($value)),* ,
                 _ => None,
             }
+        })
+    }};
+}
+
+#[macro_export]
+macro_rules! try_optional_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::OptionalDict::try_from_fn(|k| {
+            Ok(match k {
+                $($key => Some($value)),* ,
+                _ => None,
+            })
         })
     }};
 }

@@ -4,13 +4,13 @@ use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
-use crate::DictKey;
 use crate::dict_key::Array;
+use crate::{DictKey, OptionalDict};
 
 /// A dictionary that requires all keys to have values
 pub struct RequiredDict<K: DictKey, V> {
-    inner: K::Array<V>,
-    phantom: PhantomData<K>,
+    pub(crate) inner: K::Array<V>,
+    pub(crate) phantom: PhantomData<K>,
 }
 
 impl<K, V> RequiredDict<K, V>
@@ -24,6 +24,14 @@ where
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn downgrade(self) -> OptionalDict<K, V> {
+        let mut iter = self.inner.into_iter();
+        OptionalDict {
+            inner: Array::from_fn(|_| Some(iter.next().unwrap())),
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<K, V> RequiredDict<K, V>
@@ -31,9 +39,9 @@ where
     K: DictKey + FromStr,
     K::Err: Debug,
 {
-    pub fn from_fn<F>(f: F) -> Self
+    pub fn from_fn<F>(mut f: F) -> Self
     where
-        F: Fn(K) -> V,
+        F: FnMut(K) -> V,
     {
         Self {
             // SAFETY: K::VARIANTS are all valid keys
@@ -42,9 +50,9 @@ where
         }
     }
 
-    pub fn try_from_fn<F, E>(f: F) -> Result<Self, E>
+    pub fn try_from_fn<F, E>(mut f: F) -> Result<Self, E>
     where
-        F: Fn(K) -> Result<V, E>,
+        F: FnMut(K) -> Result<V, E>,
     {
         Ok(Self {
             // SAFETY: K::VARIANTS are all valid keys
@@ -192,6 +200,15 @@ macro_rules! required_dict {
     ($($key:pat => $value:expr),* $(,)?) => {{
         $crate::RequiredDict::from_fn(|k| {
             match k { $($key => $value),* }
+        })
+    }};
+}
+
+#[macro_export]
+macro_rules! try_required_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::RequiredDict::try_from_fn(|k| {
+            Ok(match k { $($key => $value),* })
         })
     }};
 }

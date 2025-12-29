@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
-pub trait Array<T>: AsRef<[T]> + AsMut<[T]> + Sized {
+pub trait Array<T>: AsRef<[T]> + AsMut<[T]> + IntoIterator<Item = T> + Sized {
     fn from_fn<F>(f: F) -> Self
     where
         F: FnMut(usize) -> T;
