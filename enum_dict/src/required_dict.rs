@@ -13,10 +13,12 @@ pub struct RequiredDict<K: DictKey, V> {
 }
 
 impl<K: DictKey, V> RequiredDict<K, V> {
+    #[inline]
     pub fn len(&self) -> usize {
         self.inner.as_ref().len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -55,6 +57,7 @@ impl<K: DictKey, V> RequiredDict<K, V> {
 }
 
 impl<K: DictKey, V: Default> Default for RequiredDict<K, V> {
+    #[inline]
     fn default() -> Self {
         Self {
             inner: Array::from_fn(|_| V::default()),
@@ -64,6 +67,7 @@ impl<K: DictKey, V: Default> Default for RequiredDict<K, V> {
 }
 
 impl<K: DictKey, V: Clone> Clone for RequiredDict<K, V> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             inner: Array::from_fn(|i| self.inner.as_ref()[i].clone()),
@@ -73,6 +77,7 @@ impl<K: DictKey, V: Clone> Clone for RequiredDict<K, V> {
 }
 
 impl<K: DictKey, V: PartialEq> PartialEq for RequiredDict<K, V> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner.as_ref() == other.inner.as_ref()
     }
@@ -81,18 +86,21 @@ impl<K: DictKey, V: PartialEq> PartialEq for RequiredDict<K, V> {
 impl<K: DictKey, V: Eq> Eq for RequiredDict<K, V> {}
 
 impl<K: DictKey, V: PartialOrd> PartialOrd for RequiredDict<K, V> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.inner.as_ref().partial_cmp(other.inner.as_ref())
     }
 }
 
 impl<K: DictKey, V: Ord> Ord for RequiredDict<K, V> {
+    #[inline]
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.inner.as_ref().cmp(other.inner.as_ref())
     }
 }
 
 impl<K: DictKey, V: Hash> Hash for RequiredDict<K, V> {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.inner.as_ref().hash(state);
     }
@@ -101,12 +109,14 @@ impl<K: DictKey, V: Hash> Hash for RequiredDict<K, V> {
 impl<K: DictKey, V> Index<K> for RequiredDict<K, V> {
     type Output = V;
 
+    #[inline]
     fn index(&self, key: K) -> &Self::Output {
         &self.inner.as_ref()[key.into_index()]
     }
 }
 
 impl<K: DictKey, V> IndexMut<K> for RequiredDict<K, V> {
+    #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
         &mut self.inner.as_mut()[key.into_index()]
     }

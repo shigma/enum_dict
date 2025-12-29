@@ -14,16 +14,19 @@ pub struct OptionalDict<K: DictKey, V> {
 
 impl<K: DictKey, V> OptionalDict<K, V> {
     /// Create a new empty OptionalDict
+    #[inline]
     pub fn new() -> Self {
         Default::default()
     }
 }
 
 impl<K: DictKey, V> OptionalDict<K, V> {
+    #[inline]
     pub fn len(&self) -> usize {
         self.inner.as_ref().iter().filter(|&v| v.is_some()).count()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -67,6 +70,7 @@ impl<K: DictKey, V> OptionalDict<K, V> {
 }
 
 impl<K: DictKey, V> Default for OptionalDict<K, V> {
+    #[inline]
     fn default() -> Self {
         Self {
             inner: Array::from_fn(|_| None),
@@ -76,6 +80,7 @@ impl<K: DictKey, V> Default for OptionalDict<K, V> {
 }
 
 impl<K: DictKey, V: Clone> Clone for OptionalDict<K, V> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             inner: Array::from_fn(|i| self.inner.as_ref()[i].clone()),
@@ -85,6 +90,7 @@ impl<K: DictKey, V: Clone> Clone for OptionalDict<K, V> {
 }
 
 impl<K: DictKey, V: PartialEq> PartialEq for OptionalDict<K, V> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.inner.as_ref() == other.inner.as_ref()
     }
@@ -93,18 +99,21 @@ impl<K: DictKey, V: PartialEq> PartialEq for OptionalDict<K, V> {
 impl<K: DictKey, V: Eq> Eq for OptionalDict<K, V> {}
 
 impl<K: DictKey, V: PartialOrd> PartialOrd for OptionalDict<K, V> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.inner.as_ref().partial_cmp(other.inner.as_ref())
     }
 }
 
 impl<K: DictKey, V: Ord> Ord for OptionalDict<K, V> {
+    #[inline]
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.inner.as_ref().cmp(other.inner.as_ref())
     }
 }
 
 impl<K: DictKey, V: Hash> Hash for OptionalDict<K, V> {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.inner.as_ref().hash(state);
     }
@@ -113,12 +122,14 @@ impl<K: DictKey, V: Hash> Hash for OptionalDict<K, V> {
 impl<K: DictKey, V> Index<K> for OptionalDict<K, V> {
     type Output = Option<V>;
 
+    #[inline]
     fn index(&self, key: K) -> &Self::Output {
         &self.inner.as_ref()[key.into_index()]
     }
 }
 
 impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
+    #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
         &mut self.inner.as_mut()[key.into_index()]
     }
