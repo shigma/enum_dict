@@ -11,7 +11,7 @@ Add to your `Cargo.toml`:
  
 ```toml
 [dependencies]
-enum_dict = { version = "0.4", features = ["full"] }
+enum_dict = { version = "0.5", features = ["full"] }
 ```
 
 ## Quick Start
