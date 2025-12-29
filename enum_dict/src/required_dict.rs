@@ -1,8 +1,8 @@
-use std::fmt::{Debug, Display};
-use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
-use std::ops::{Index, IndexMut};
-use std::str::FromStr;
+use core::fmt::{Debug, Display};
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
+use core::ops::{Index, IndexMut};
+use core::str::FromStr;
 
 use crate::dict_key::Array;
 use crate::{DictKey, OptionalDict};
@@ -89,13 +89,13 @@ impl<K: DictKey, V: PartialEq> PartialEq for RequiredDict<K, V> {
 impl<K: DictKey, V: Eq> Eq for RequiredDict<K, V> {}
 
 impl<K: DictKey, V: PartialOrd> PartialOrd for RequiredDict<K, V> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.inner.as_ref().partial_cmp(other.inner.as_ref())
     }
 }
 
 impl<K: DictKey, V: Ord> Ord for RequiredDict<K, V> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.inner.as_ref().cmp(other.inner.as_ref())
     }
 }
@@ -121,7 +121,7 @@ impl<K: DictKey, V> IndexMut<K> for RequiredDict<K, V> {
 }
 
 impl<K: DictKey, V: Debug> Debug for RequiredDict<K, V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_map()
             .entries(
                 self.inner
@@ -135,7 +135,7 @@ impl<K: DictKey, V: Debug> Debug for RequiredDict<K, V> {
 }
 
 impl<K: DictKey, V: Display> Display for RequiredDict<K, V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{{")?;
         let mut is_first = true;
         for (index, value) in self.inner.as_ref().iter().enumerate() {
@@ -167,30 +167,32 @@ mod serde_impl {
         }
     }
 
+    struct MissingKeys<K: DictKey, V>(OptionalDict<K, V>);
+
+    impl<K: DictKey, V> core::fmt::Display for MissingKeys<K, V> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "Missing keys: ")?;
+            let mut is_first = true;
+            for (index, value) in self.0.inner.as_ref().iter().enumerate() {
+                if value.is_some() {
+                    continue;
+                }
+                if !is_first {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}", K::VARIANTS[index])?;
+                is_first = false;
+            }
+            Ok(())
+        }
+    }
+
     impl<'de, K: DictKey, V: Deserialize<'de>> Deserialize<'de> for RequiredDict<K, V> {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            let vec = deserializer.deserialize_map(DictVisitor::<K, V>::new())?;
-
-            // Check for missing keys
-            let mut missing_keys = vec![];
-            for (index, &name) in K::VARIANTS.iter().enumerate() {
-                if vec[index].is_none() {
-                    missing_keys.push(name);
-                }
-            }
-            if !missing_keys.is_empty() {
-                return Err(serde::de::Error::custom(format!(
-                    "Missing keys: {}",
-                    missing_keys.join(", ")
-                )));
-            }
-
-            let mut iter = vec.into_iter();
-            Ok(Self {
-                // SAFETY: checked for missing keys above
-                inner: Array::from_fn(|_| iter.next().unwrap().unwrap()),
-                phantom: PhantomData,
-            })
+            deserializer
+                .deserialize_map(DictVisitor::<K, V>::new())?
+                .upgrade()
+                .map_err(|dict| serde::de::Error::custom(MissingKeys(dict)))
         }
     }
 }

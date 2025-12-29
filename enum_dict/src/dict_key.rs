@@ -1,5 +1,4 @@
-use std::marker::PhantomData;
-use std::mem::MaybeUninit;
+use core::mem::MaybeUninit;
 
 pub trait Array<T>: AsRef<[T]> + AsMut<[T]> + IntoIterator<Item = T> + Sized {
     fn from_fn<F>(f: F) -> Self
@@ -16,7 +15,7 @@ impl<const N: usize, T> Array<T> for [T; N] {
     where
         F: FnMut(usize) -> T,
     {
-        std::array::from_fn(f)
+        core::array::from_fn(f)
     }
 
     fn try_from_fn<F, E>(mut f: F) -> Result<Self, E>
@@ -44,43 +43,46 @@ pub trait DictKey {
     fn variant_index(self) -> usize;
 }
 
-pub(crate) struct DictVisitor<K, V>(PhantomData<(K, V)>);
+#[cfg(feature = "serde")]
+pub struct DictVisitor<K, V>(core::marker::PhantomData<(K, V)>);
 
+#[cfg(feature = "serde")]
 impl<K, V> DictVisitor<K, V> {
     #[inline]
     pub fn new() -> Self {
-        Self(PhantomData)
+        Self(core::marker::PhantomData)
     }
 }
 
 #[cfg(feature = "serde")]
 mod serde_impl {
-    use std::fmt;
+    use core::fmt;
 
     use serde::Deserialize;
     use serde::de::{MapAccess, Visitor};
 
     use super::*;
+    use crate::OptionalDict;
 
     impl<'de, K: DictKey, V: Deserialize<'de>> Visitor<'de> for DictVisitor<K, V> {
-        type Value = Vec<Option<V>>;
+        type Value = OptionalDict<K, V>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("a map with optional keys")
         }
 
         fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-            let mut vec = K::VARIANTS.iter().map(|_| None).collect::<Vec<_>>();
-            while let Some((key, value)) = map.next_entry::<String, V>()? {
+            let mut dict = OptionalDict::<K, V>::new();
+            while let Some((key, value)) = map.next_entry::<&str, V>()? {
                 // ignore unknown keys
                 for (index, &name) in K::VARIANTS.iter().enumerate() {
                     if name == key {
-                        vec[index] = Some(value);
+                        dict.inner.as_mut()[index] = Some(value);
                         break;
                     }
                 }
             }
-            Ok(vec)
+            Ok(dict)
         }
     }
 }

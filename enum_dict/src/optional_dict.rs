@@ -1,8 +1,8 @@
-use std::fmt::{Debug, Display};
-use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
-use std::ops::{Index, IndexMut};
-use std::str::FromStr;
+use core::fmt::{Debug, Display};
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
+use core::ops::{Index, IndexMut};
+use core::str::FromStr;
 
 use crate::dict_key::Array;
 use crate::{DictKey, RequiredDict};
@@ -29,12 +29,17 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         self.len() == 0
     }
 
-    pub fn upgrade(self) -> Option<RequiredDict<K, V>> {
-        let mut iter = self.inner.into_iter();
-        Some(RequiredDict {
-            inner: Array::try_from_fn(|_| iter.next().unwrap().ok_or(())).ok()?,
-            phantom: PhantomData,
-        })
+    pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
+        let is_filled = self.inner.as_ref().iter().all(|v| v.is_some());
+        if is_filled {
+            let mut iter = self.inner.into_iter();
+            Ok(RequiredDict {
+                inner: Array::from_fn(|_| iter.next().unwrap().unwrap()),
+                phantom: PhantomData,
+            })
+        } else {
+            Err(self)
+        }
     }
 }
 
@@ -96,13 +101,13 @@ impl<K: DictKey, V: PartialEq> PartialEq for OptionalDict<K, V> {
 impl<K: DictKey, V: Eq> Eq for OptionalDict<K, V> {}
 
 impl<K: DictKey, V: PartialOrd> PartialOrd for OptionalDict<K, V> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.inner.as_ref().partial_cmp(other.inner.as_ref())
     }
 }
 
 impl<K: DictKey, V: Ord> Ord for OptionalDict<K, V> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.inner.as_ref().cmp(other.inner.as_ref())
     }
 }
@@ -128,7 +133,7 @@ impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
 }
 
 impl<K: DictKey, V: Debug> Debug for OptionalDict<K, V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_map()
             .entries(
                 self.inner
@@ -142,7 +147,7 @@ impl<K: DictKey, V: Debug> Debug for OptionalDict<K, V> {
 }
 
 impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{{")?;
         let mut is_first = true;
         for (index, value) in self.inner.as_ref().iter().enumerate() {
@@ -180,13 +185,9 @@ mod serde_impl {
     }
 
     impl<'de, K: DictKey, V: Deserialize<'de>> Deserialize<'de> for OptionalDict<K, V> {
+        #[inline]
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            let vec = deserializer.deserialize_map(DictVisitor::<K, V>::new())?;
-            let mut iter = vec.into_iter();
-            Ok(Self {
-                inner: Array::from_fn(|_| iter.next().unwrap()),
-                phantom: PhantomData,
-            })
+            deserializer.deserialize_map(DictVisitor::<K, V>::new())
         }
     }
 }
