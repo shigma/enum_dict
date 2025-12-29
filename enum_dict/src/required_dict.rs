@@ -23,16 +23,6 @@ impl<K: DictKey, V> RequiredDict<K, V> {
         self.len() == 0
     }
 
-    pub fn downgrade(self) -> OptionalDict<K, V> {
-        let mut iter = self.inner.into_iter();
-        OptionalDict {
-            inner: Array::from_fn(|_| Some(iter.next().unwrap())),
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<K: DictKey, V> RequiredDict<K, V> {
     #[inline]
     pub fn from_fn<F>(mut f: F) -> Self
     where
@@ -53,6 +43,36 @@ impl<K: DictKey, V> RequiredDict<K, V> {
             inner: Array::try_from_fn(|i| f(K::from_index(i)))?,
             phantom: PhantomData,
         })
+    }
+
+    pub fn map<F, U>(self, mut f: F) -> RequiredDict<K, U>
+    where
+        F: FnMut(V) -> U,
+    {
+        let mut iter = self.inner.into_iter();
+        RequiredDict {
+            inner: Array::from_fn(|_| f(iter.next().unwrap())),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn try_map<F, U, E>(self, mut f: F) -> Result<RequiredDict<K, U>, E>
+    where
+        F: FnMut(V) -> Result<U, E>,
+    {
+        let mut iter = self.inner.into_iter();
+        Ok(RequiredDict {
+            inner: Array::try_from_fn(|_| f(iter.next().unwrap()))?,
+            phantom: PhantomData,
+        })
+    }
+
+    pub fn downgrade(self) -> OptionalDict<K, V> {
+        let mut iter = self.inner.into_iter();
+        OptionalDict {
+            inner: Array::from_fn(|_| Some(iter.next().unwrap())),
+            phantom: PhantomData,
+        }
     }
 }
 

@@ -31,21 +31,6 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         self.len() == 0
     }
 
-    pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
-        let is_filled = self.inner.as_ref().iter().all(|v| v.is_some());
-        if is_filled {
-            let mut iter = self.inner.into_iter();
-            Ok(RequiredDict {
-                inner: Array::from_fn(|_| iter.next().unwrap().unwrap()),
-                phantom: PhantomData,
-            })
-        } else {
-            Err(self)
-        }
-    }
-}
-
-impl<K: DictKey, V> OptionalDict<K, V> {
     #[inline]
     pub fn from_fn<F>(mut f: F) -> Self
     where
@@ -66,6 +51,41 @@ impl<K: DictKey, V> OptionalDict<K, V> {
             inner: Array::try_from_fn(|i| f(K::from_index(i)))?,
             phantom: PhantomData,
         })
+    }
+
+    pub fn map<F, U>(self, mut f: F) -> OptionalDict<K, U>
+    where
+        F: FnMut(V) -> U,
+    {
+        let mut iter = self.inner.into_iter();
+        OptionalDict {
+            inner: Array::from_fn(|_| iter.next().unwrap().map(&mut f)),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn try_map<F, U, E>(self, mut f: F) -> Result<OptionalDict<K, U>, E>
+    where
+        F: FnMut(V) -> Result<U, E>,
+    {
+        let mut iter = self.inner.into_iter();
+        Ok(OptionalDict {
+            inner: Array::try_from_fn(|_| iter.next().unwrap().map(&mut f).transpose())?,
+            phantom: PhantomData,
+        })
+    }
+
+    pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
+        let is_filled = self.inner.as_ref().iter().all(|v| v.is_some());
+        if is_filled {
+            let mut iter = self.inner.into_iter();
+            Ok(RequiredDict {
+                inner: Array::from_fn(|_| iter.next().unwrap().unwrap()),
+                phantom: PhantomData,
+            })
+        } else {
+            Err(self)
+        }
     }
 }
 
