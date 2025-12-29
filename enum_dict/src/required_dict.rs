@@ -22,18 +22,34 @@ impl<K, V> RequiredDict<K, V> {
     }
 }
 
-impl<K, V, F> From<F> for RequiredDict<K, V>
+impl<K, V> RequiredDict<K, V>
 where
     K: DictKey + FromStr,
     K::Err: Debug,
-    F: Fn(K) -> V,
 {
-    fn from(f: F) -> Self {
+    pub fn from_fn<F>(f: F) -> Self
+    where
+        F: Fn(K) -> V,
+    {
         Self {
             // SAFETY: K::VARIANTS are all valid keys
             inner: K::VARIANTS.iter().map(|s| f(s.parse().unwrap())).collect(),
             phantom: PhantomData,
         }
+    }
+
+    pub fn try_from_fn<F, E>(f: F) -> Result<Self, E>
+    where
+        F: Fn(K) -> Result<V, E>,
+    {
+        Ok(Self {
+            // SAFETY: K::VARIANTS are all valid keys
+            inner: K::VARIANTS
+                .iter()
+                .map(|s| f(s.parse().unwrap()))
+                .collect::<Result<Vec<_>, E>>()?,
+            phantom: PhantomData,
+        })
     }
 }
 

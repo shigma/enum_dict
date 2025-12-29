@@ -18,7 +18,7 @@ pub enum RenameRule {
     ScreamingKebabCase,
 }
 
-static RENAME_RULES: &[(&str, RenameRule)] = &[
+const RENAME_RULES: &[(&str, RenameRule)] = &[
     ("lowercase", RenameRule::LowerCase),
     ("UPPERCASE", RenameRule::UpperCase),
     ("PascalCase", RenameRule::PascalCase),
