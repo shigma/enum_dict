@@ -90,7 +90,7 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
     let mut ident_names = TokenStream2::new();
     let mut match_arms = TokenStream2::new();
     let variant_count = data.variants.len();
-    for variant in data.variants {
+    for (index, variant) in data.variants.into_iter().enumerate() {
         let syn::Fields::Unit = &variant.fields else {
             errors.extend(
                 syn::Error::new(variant.span(), "DictKey can only be derived for unit variants").to_compile_error(),
@@ -138,7 +138,7 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
             }
         }
 
-        match_arms.extend(quote! { #name => Ok(Self::#ident), });
+        match_arms.extend(quote! { #index => Self::#ident, });
         ident_names.extend(quote! { #name, });
     }
 
@@ -151,20 +151,19 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
         #[automatically_derived]
         impl ::enum_dict::DictKey for #ident {
             type Array<T> = [T; #variant_count];
-            const VARIANTS: &'static [&'static str] = &[#ident_names];
-            fn variant_index(self) -> usize {
-                self as usize
-            }
-        }
 
-        #[automatically_derived]
-        impl ::std::str::FromStr for #ident {
-            type Err = ();
-            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-                match s {
+            const VARIANTS: &'static [&'static str] = &[#ident_names];
+
+            fn from_index(index: usize) -> Self {
+                match index {
                     #match_arms
-                    _ => std::result::Result::Err(()),
+                    _ => panic!("invalid index for DictKey"),
                 }
+            }
+
+            #[inline]
+            fn into_index(self) -> usize {
+                self as usize
             }
         }
     }

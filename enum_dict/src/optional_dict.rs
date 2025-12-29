@@ -2,7 +2,6 @@ use core::fmt::{Debug, Display};
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};
-use core::str::FromStr;
 
 use crate::dict_key::Array;
 use crate::{DictKey, RequiredDict};
@@ -43,38 +42,31 @@ impl<K: DictKey, V> OptionalDict<K, V> {
     }
 }
 
-impl<K, V> OptionalDict<K, V>
-where
-    K: DictKey + FromStr,
-    K::Err: Debug,
-{
+impl<K: DictKey, V> OptionalDict<K, V> {
+    #[inline]
     pub fn from_fn<F>(mut f: F) -> Self
     where
         F: FnMut(K) -> Option<V>,
     {
         Self {
-            // SAFETY: K::VARIANTS are all valid keys
-            inner: Array::from_fn(|i| f(K::VARIANTS[i].parse().unwrap())),
+            inner: Array::from_fn(|i| f(K::from_index(i))),
             phantom: PhantomData,
         }
     }
 
+    #[inline]
     pub fn try_from_fn<F, E>(mut f: F) -> Result<Self, E>
     where
         F: FnMut(K) -> Result<Option<V>, E>,
     {
         Ok(Self {
-            // SAFETY: K::VARIANTS are all valid keys
-            inner: Array::try_from_fn(|i| f(K::VARIANTS[i].parse().unwrap()))?,
+            inner: Array::try_from_fn(|i| f(K::from_index(i)))?,
             phantom: PhantomData,
         })
     }
 }
 
-impl<K, V> Default for OptionalDict<K, V>
-where
-    K: DictKey,
-{
+impl<K: DictKey, V> Default for OptionalDict<K, V> {
     fn default() -> Self {
         Self {
             inner: Array::from_fn(|_| None),
@@ -122,13 +114,13 @@ impl<K: DictKey, V> Index<K> for OptionalDict<K, V> {
     type Output = Option<V>;
 
     fn index(&self, key: K) -> &Self::Output {
-        &self.inner.as_ref()[key.variant_index()]
+        &self.inner.as_ref()[key.into_index()]
     }
 }
 
 impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        &mut self.inner.as_mut()[key.variant_index()]
+        &mut self.inner.as_mut()[key.into_index()]
     }
 }
 
