@@ -75,6 +75,22 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         })
     }
 
+    pub fn each_ref(&self) -> OptionalDict<K, &V> {
+        let mut iter = self.inner.as_ref().iter();
+        OptionalDict {
+            inner: Array::from_fn(|_| iter.next().unwrap().as_ref()),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn each_mut(&mut self) -> OptionalDict<K, &mut V> {
+        let mut iter = self.inner.as_mut().iter_mut();
+        OptionalDict {
+            inner: Array::from_fn(|_| iter.next().unwrap().as_mut()),
+            phantom: PhantomData,
+        }
+    }
+
     pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
         let is_filled = self.inner.as_ref().iter().all(|v| v.is_some());
         if is_filled {

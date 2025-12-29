@@ -67,6 +67,22 @@ impl<K: DictKey, V> RequiredDict<K, V> {
         })
     }
 
+    pub fn each_ref(&self) -> RequiredDict<K, &V> {
+        let mut iter = self.inner.as_ref().iter();
+        RequiredDict {
+            inner: Array::from_fn(|_| iter.next().unwrap()),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn each_mut(&mut self) -> RequiredDict<K, &mut V> {
+        let mut iter = self.inner.as_mut().iter_mut();
+        RequiredDict {
+            inner: Array::from_fn(|_| iter.next().unwrap()),
+            phantom: PhantomData,
+        }
+    }
+
     pub fn downgrade(self) -> OptionalDict<K, V> {
         let mut iter = self.inner.into_iter();
         OptionalDict {
