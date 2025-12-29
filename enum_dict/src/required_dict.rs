@@ -5,16 +5,20 @@ use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
 use crate::DictKey;
+use crate::dict_key::Array;
 
 /// A dictionary that requires all keys to have values
-pub struct RequiredDict<K, V> {
-    inner: Vec<V>,
+pub struct RequiredDict<K: DictKey, V> {
+    inner: K::Array<V>,
     phantom: PhantomData<K>,
 }
 
-impl<K, V> RequiredDict<K, V> {
+impl<K, V> RequiredDict<K, V>
+where
+    K: DictKey,
+{
     pub fn len(&self) -> usize {
-        self.inner.len()
+        self.inner.as_ref().len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -33,7 +37,7 @@ where
     {
         Self {
             // SAFETY: K::VARIANTS are all valid keys
-            inner: K::VARIANTS.iter().map(|s| f(s.parse().unwrap())).collect(),
+            inner: Array::from_fn(|i| f(K::VARIANTS[i].parse().unwrap())),
             phantom: PhantomData,
         }
     }
@@ -44,10 +48,7 @@ where
     {
         Ok(Self {
             // SAFETY: K::VARIANTS are all valid keys
-            inner: K::VARIANTS
-                .iter()
-                .map(|s| f(s.parse().unwrap()))
-                .collect::<Result<Vec<_>, E>>()?,
+            inner: Array::try_from_fn(|i| f(K::VARIANTS[i].parse().unwrap()))?,
             phantom: PhantomData,
         })
     }
@@ -56,44 +57,44 @@ where
 impl<K: DictKey, V: Default> Default for RequiredDict<K, V> {
     fn default() -> Self {
         Self {
-            inner: K::VARIANTS.iter().map(|_| V::default()).collect(),
+            inner: Array::from_fn(|_| V::default()),
             phantom: PhantomData,
         }
     }
 }
 
-impl<K, V: Clone> Clone for RequiredDict<K, V> {
+impl<K: DictKey, V: Clone> Clone for RequiredDict<K, V> {
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
+            inner: Array::from_fn(|i| self.inner.as_ref()[i].clone()),
             phantom: PhantomData,
         }
     }
 }
 
-impl<K, V: PartialEq> PartialEq for RequiredDict<K, V> {
+impl<K: DictKey, V: PartialEq> PartialEq for RequiredDict<K, V> {
     fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner
+        self.inner.as_ref() == other.inner.as_ref()
     }
 }
 
-impl<K, V: Eq> Eq for RequiredDict<K, V> {}
+impl<K: DictKey, V: Eq> Eq for RequiredDict<K, V> {}
 
-impl<K, V: PartialOrd> PartialOrd for RequiredDict<K, V> {
+impl<K: DictKey, V: PartialOrd> PartialOrd for RequiredDict<K, V> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
+        self.inner.as_ref().partial_cmp(other.inner.as_ref())
     }
 }
 
-impl<K, V: Ord> Ord for RequiredDict<K, V> {
+impl<K: DictKey, V: Ord> Ord for RequiredDict<K, V> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.inner.cmp(&other.inner)
+        self.inner.as_ref().cmp(other.inner.as_ref())
     }
 }
 
-impl<K, V: Hash> Hash for RequiredDict<K, V> {
+impl<K: DictKey, V: Hash> Hash for RequiredDict<K, V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.inner.hash(state);
+        self.inner.as_ref().hash(state);
     }
 }
 
@@ -101,13 +102,13 @@ impl<K: DictKey, V> Index<K> for RequiredDict<K, V> {
     type Output = V;
 
     fn index(&self, key: K) -> &Self::Output {
-        &self.inner[key.variant_index()]
+        &self.inner.as_ref()[key.variant_index()]
     }
 }
 
 impl<K: DictKey, V> IndexMut<K> for RequiredDict<K, V> {
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        &mut self.inner[key.variant_index()]
+        &mut self.inner.as_mut()[key.variant_index()]
     }
 }
 
@@ -116,6 +117,7 @@ impl<K: DictKey, V: Debug> Debug for RequiredDict<K, V> {
         f.debug_map()
             .entries(
                 self.inner
+                    .as_ref()
                     .iter()
                     .enumerate()
                     .map(|(index, value)| (K::VARIANTS[index], value)),
@@ -128,7 +130,7 @@ impl<K: DictKey, V: Display> Display for RequiredDict<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{")?;
         let mut is_first = true;
-        for (index, value) in self.inner.iter().enumerate() {
+        for (index, value) in self.inner.as_ref().iter().enumerate() {
             if is_first {
                 write!(f, ", ")?;
             }
@@ -149,8 +151,8 @@ mod serde_impl {
 
     impl<K: DictKey, V: Serialize> Serialize for RequiredDict<K, V> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            let mut map = serializer.serialize_map(Some(self.inner.len()))?;
-            for (index, value) in self.inner.iter().enumerate() {
+            let mut map = serializer.serialize_map(Some(self.inner.as_ref().len()))?;
+            for (index, value) in self.inner.as_ref().iter().enumerate() {
                 map.serialize_entry(K::VARIANTS[index], value)?;
             }
             map.end()
@@ -175,9 +177,10 @@ mod serde_impl {
                 )));
             }
 
+            let mut iter = vec.into_iter();
             Ok(Self {
                 // SAFETY: checked for missing keys above
-                inner: vec.into_iter().map(Option::unwrap).collect(),
+                inner: Array::from_fn(|_| iter.next().unwrap().unwrap()),
                 phantom: PhantomData,
             })
         }
@@ -187,7 +190,7 @@ mod serde_impl {
 #[macro_export]
 macro_rules! required_dict {
     ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::RequiredDict::from(|k| {
+        $crate::RequiredDict::from_fn(|k| {
             match k { $($key => $value),* }
         })
     }};

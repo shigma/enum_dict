@@ -5,26 +5,24 @@ use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
 use crate::DictKey;
+use crate::dict_key::Array;
 
 /// A dictionary where keys may or may not have values
-pub struct OptionalDict<K, V> {
-    inner: Vec<Option<V>>,
+pub struct OptionalDict<K: DictKey, V> {
+    inner: K::Array<Option<V>>,
     phantom: PhantomData<K>,
 }
 
-impl<K, V> OptionalDict<K, V>
-where
-    K: DictKey,
-{
+impl<K: DictKey, V> OptionalDict<K, V> {
     /// Create a new empty OptionalDict
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl<K, V> OptionalDict<K, V> {
+impl<K: DictKey, V> OptionalDict<K, V> {
     pub fn len(&self) -> usize {
-        self.inner.iter().filter(|&v| v.is_some()).count()
+        self.inner.as_ref().iter().filter(|&v| v.is_some()).count()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -43,7 +41,7 @@ where
     {
         Self {
             // SAFETY: K::VARIANTS are all valid keys
-            inner: K::VARIANTS.iter().map(|s| f(s.parse().unwrap())).collect(),
+            inner: Array::from_fn(|i| f(K::VARIANTS[i].parse().unwrap())),
             phantom: PhantomData,
         }
     }
@@ -54,10 +52,7 @@ where
     {
         Ok(Self {
             // SAFETY: K::VARIANTS are all valid keys
-            inner: K::VARIANTS
-                .iter()
-                .map(|s| f(s.parse().unwrap()))
-                .collect::<Result<Vec<_>, E>>()?,
+            inner: Array::try_from_fn(|i| f(K::VARIANTS[i].parse().unwrap()))?,
             phantom: PhantomData,
         })
     }
@@ -69,44 +64,44 @@ where
 {
     fn default() -> Self {
         Self {
-            inner: K::VARIANTS.iter().map(|_| None).collect(),
+            inner: Array::from_fn(|_| None),
             phantom: PhantomData,
         }
     }
 }
 
-impl<K, V: Clone> Clone for OptionalDict<K, V> {
+impl<K: DictKey, V: Clone> Clone for OptionalDict<K, V> {
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
+            inner: Array::from_fn(|i| self.inner.as_ref()[i].clone()),
             phantom: PhantomData,
         }
     }
 }
 
-impl<K, V: PartialEq> PartialEq for OptionalDict<K, V> {
+impl<K: DictKey, V: PartialEq> PartialEq for OptionalDict<K, V> {
     fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner
+        self.inner.as_ref() == other.inner.as_ref()
     }
 }
 
-impl<K, V: Eq> Eq for OptionalDict<K, V> {}
+impl<K: DictKey, V: Eq> Eq for OptionalDict<K, V> {}
 
-impl<K, V: PartialOrd> PartialOrd for OptionalDict<K, V> {
+impl<K: DictKey, V: PartialOrd> PartialOrd for OptionalDict<K, V> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
+        self.inner.as_ref().partial_cmp(other.inner.as_ref())
     }
 }
 
-impl<K, V: Ord> Ord for OptionalDict<K, V> {
+impl<K: DictKey, V: Ord> Ord for OptionalDict<K, V> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.inner.cmp(&other.inner)
+        self.inner.as_ref().cmp(other.inner.as_ref())
     }
 }
 
-impl<K, V: Hash> Hash for OptionalDict<K, V> {
+impl<K: DictKey, V: Hash> Hash for OptionalDict<K, V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.inner.hash(state);
+        self.inner.as_ref().hash(state);
     }
 }
 
@@ -114,13 +109,13 @@ impl<K: DictKey, V> Index<K> for OptionalDict<K, V> {
     type Output = Option<V>;
 
     fn index(&self, key: K) -> &Self::Output {
-        &self.inner[key.variant_index()]
+        &self.inner.as_ref()[key.variant_index()]
     }
 }
 
 impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        &mut self.inner[key.variant_index()]
+        &mut self.inner.as_mut()[key.variant_index()]
     }
 }
 
@@ -129,6 +124,7 @@ impl<K: DictKey, V: Debug> Debug for OptionalDict<K, V> {
         f.debug_map()
             .entries(
                 self.inner
+                    .as_ref()
                     .iter()
                     .enumerate()
                     .filter_map(|(index, value)| value.as_ref().map(|value| (K::VARIANTS[index], value))),
@@ -141,7 +137,7 @@ impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{")?;
         let mut is_first = true;
-        for (index, value) in self.inner.iter().enumerate() {
+        for (index, value) in self.inner.as_ref().iter().enumerate() {
             let Some(value) = value else {
                 continue;
             };
@@ -165,8 +161,8 @@ mod serde_impl {
 
     impl<K: DictKey, V: Serialize> Serialize for OptionalDict<K, V> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            let mut map = serializer.serialize_map(Some(self.inner.len()))?;
-            for (index, value) in self.inner.iter().enumerate() {
+            let mut map = serializer.serialize_map(Some(self.inner.as_ref().len()))?;
+            for (index, value) in self.inner.as_ref().iter().enumerate() {
                 if let Some(value) = value {
                     map.serialize_entry(K::VARIANTS[index], value)?;
                 }
@@ -178,9 +174,9 @@ mod serde_impl {
     impl<'de, K: DictKey, V: Deserialize<'de>> Deserialize<'de> for OptionalDict<K, V> {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             let vec = deserializer.deserialize_map(DictVisitor::<K, V>::new())?;
-
+            let mut iter = vec.into_iter();
             Ok(Self {
-                inner: vec,
+                inner: Array::from_fn(|_| iter.next().unwrap()),
                 phantom: PhantomData,
             })
         }
@@ -190,7 +186,7 @@ mod serde_impl {
 #[macro_export]
 macro_rules! optional_dict {
     ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::OptionalDict::from(|k| {
+        $crate::OptionalDict::from_fn(|k| {
             match k {
                 $($key => Some($value)),* ,
                 _ => None,

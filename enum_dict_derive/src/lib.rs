@@ -89,6 +89,7 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
 
     let mut ident_names = TokenStream2::new();
     let mut match_arms = TokenStream2::new();
+    let variant_count = data.variants.len();
     for variant in data.variants {
         let syn::Fields::Unit = &variant.fields else {
             errors.extend(
@@ -149,6 +150,7 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
     quote! {
         #[automatically_derived]
         impl ::enum_dict::DictKey for #ident {
+            type Array<T> = [T; #variant_count];
             const VARIANTS: &'static [&'static str] = &[#ident_names];
             fn variant_index(self) -> usize {
                 self as usize

@@ -1,7 +1,43 @@
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+
+pub trait Array<T>: AsRef<[T]> + AsMut<[T]> + Sized {
+    fn from_fn<F>(f: F) -> Self
+    where
+        F: FnMut(usize) -> T;
+
+    fn try_from_fn<F, E>(f: F) -> Result<Self, E>
+    where
+        F: FnMut(usize) -> Result<T, E>;
+}
+
+impl<const N: usize, T> Array<T> for [T; N] {
+    fn from_fn<F>(f: F) -> Self
+    where
+        F: FnMut(usize) -> T,
+    {
+        std::array::from_fn(f)
+    }
+
+    fn try_from_fn<F, E>(mut f: F) -> Result<Self, E>
+    where
+        F: FnMut(usize) -> Result<T, E>,
+    {
+        let mut arr = MaybeUninit::<Self>::uninit();
+        unsafe {
+            let ptr = arr.as_mut_ptr() as *mut T;
+            for i in 0..N {
+                ptr.add(i).write(f(i)?);
+            }
+            Ok(arr.assume_init())
+        }
+    }
+}
 
 /// Trait for types that can be used as dictionary keys
 pub trait DictKey {
+    type Array<T>: Array<T>;
+
     const VARIANTS: &'static [&'static str];
 
     /// Convert to usize index
@@ -11,6 +47,7 @@ pub trait DictKey {
 pub(crate) struct DictVisitor<K, V>(PhantomData<(K, V)>);
 
 impl<K, V> DictVisitor<K, V> {
+    #[inline]
     pub fn new() -> Self {
         Self(PhantomData)
     }
