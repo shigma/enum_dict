@@ -14,6 +14,14 @@ pub struct RequiredDict<K: DictKey, V> {
 
 impl<K: DictKey, V> RequiredDict<K, V> {
     #[inline]
+    pub(crate) fn from_inner(inner: K::Array<V>) -> Self {
+        Self {
+            inner,
+            phantom: PhantomData,
+        }
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.inner.as_ref().len()
     }
@@ -28,10 +36,7 @@ impl<K: DictKey, V> RequiredDict<K, V> {
     where
         F: FnMut(K) -> V,
     {
-        Self {
-            inner: Array::from_fn(|i| f(K::from_index(i))),
-            phantom: PhantomData,
-        }
+        Self::from_inner(Array::from_fn(|i| f(K::from_index(i))))
     }
 
     #[inline]
@@ -39,10 +44,7 @@ impl<K: DictKey, V> RequiredDict<K, V> {
     where
         F: FnMut(K) -> Result<V, E>,
     {
-        Ok(Self {
-            inner: Array::try_from_fn(|i| f(K::from_index(i)))?,
-            phantom: PhantomData,
-        })
+        Ok(Self::from_inner(Array::try_from_fn(|i| f(K::from_index(i)))?))
     }
 
     pub fn map<F, U>(self, mut f: F) -> RequiredDict<K, U>
@@ -50,10 +52,7 @@ impl<K: DictKey, V> RequiredDict<K, V> {
         F: FnMut(V) -> U,
     {
         let mut iter = self.inner.into_iter();
-        RequiredDict {
-            inner: Array::from_fn(|_| f(iter.next().unwrap())),
-            phantom: PhantomData,
-        }
+        RequiredDict::from_inner(Array::from_fn(|_| f(iter.next().unwrap())))
     }
 
     pub fn try_map<F, U, E>(self, mut f: F) -> Result<RequiredDict<K, U>, E>
@@ -61,54 +60,45 @@ impl<K: DictKey, V> RequiredDict<K, V> {
         F: FnMut(V) -> Result<U, E>,
     {
         let mut iter = self.inner.into_iter();
-        Ok(RequiredDict {
-            inner: Array::try_from_fn(|_| f(iter.next().unwrap()))?,
-            phantom: PhantomData,
-        })
+        Ok(RequiredDict::from_inner(Array::try_from_fn(|_| {
+            f(iter.next().unwrap())
+        })?))
     }
 
     pub fn each_ref(&self) -> RequiredDict<K, &V> {
         let mut iter = self.inner.as_ref().iter();
-        RequiredDict {
-            inner: Array::from_fn(|_| iter.next().unwrap()),
-            phantom: PhantomData,
-        }
+        RequiredDict::from_inner(Array::from_fn(|_| iter.next().unwrap()))
     }
 
     pub fn each_mut(&mut self) -> RequiredDict<K, &mut V> {
         let mut iter = self.inner.as_mut().iter_mut();
-        RequiredDict {
-            inner: Array::from_fn(|_| iter.next().unwrap()),
-            phantom: PhantomData,
-        }
+        RequiredDict::from_inner(Array::from_fn(|_| iter.next().unwrap()))
     }
 
     pub fn downgrade(self) -> OptionalDict<K, V> {
         let mut iter = self.inner.into_iter();
-        OptionalDict {
-            inner: Array::from_fn(|_| Some(iter.next().unwrap())),
-            phantom: PhantomData,
-        }
+        OptionalDict::from_inner(Array::from_fn(|_| Some(iter.next().unwrap())))
+    }
+}
+
+impl<K: DictKey, V> From<OptionalDict<K, V>> for RequiredDict<K, Option<V>> {
+    #[inline]
+    fn from(dict: OptionalDict<K, V>) -> Self {
+        Self::from_inner(dict.inner)
     }
 }
 
 impl<K: DictKey, V: Default> Default for RequiredDict<K, V> {
     #[inline]
     fn default() -> Self {
-        Self {
-            inner: Array::from_fn(|_| V::default()),
-            phantom: PhantomData,
-        }
+        Self::from_inner(Array::from_fn(|_| V::default()))
     }
 }
 
 impl<K: DictKey, V: Clone> Clone for RequiredDict<K, V> {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            inner: Array::from_fn(|i| self.inner.as_ref()[i].clone()),
-            phantom: PhantomData,
-        }
+        Self::from_inner(Array::from_fn(|i| self.inner.as_ref()[i].clone()))
     }
 }
 

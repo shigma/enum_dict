@@ -18,9 +18,15 @@ impl<K: DictKey, V> OptionalDict<K, V> {
     pub fn new() -> Self {
         Default::default()
     }
-}
 
-impl<K: DictKey, V> OptionalDict<K, V> {
+    #[inline]
+    pub(crate) fn from_inner(inner: K::Array<Option<V>>) -> Self {
+        Self {
+            inner,
+            phantom: PhantomData,
+        }
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         self.inner.as_ref().iter().filter(|&v| v.is_some()).count()
@@ -36,10 +42,7 @@ impl<K: DictKey, V> OptionalDict<K, V> {
     where
         F: FnMut(K) -> Option<V>,
     {
-        Self {
-            inner: Array::from_fn(|i| f(K::from_index(i))),
-            phantom: PhantomData,
-        }
+        Self::from_inner(Array::from_fn(|i| f(K::from_index(i))))
     }
 
     #[inline]
@@ -47,10 +50,7 @@ impl<K: DictKey, V> OptionalDict<K, V> {
     where
         F: FnMut(K) -> Result<Option<V>, E>,
     {
-        Ok(Self {
-            inner: Array::try_from_fn(|i| f(K::from_index(i)))?,
-            phantom: PhantomData,
-        })
+        Ok(Self::from_inner(Array::try_from_fn(|i| f(K::from_index(i)))?))
     }
 
     pub fn map<F, U>(self, mut f: F) -> OptionalDict<K, U>
@@ -58,10 +58,7 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         F: FnMut(V) -> U,
     {
         let mut iter = self.inner.into_iter();
-        OptionalDict {
-            inner: Array::from_fn(|_| iter.next().unwrap().map(&mut f)),
-            phantom: PhantomData,
-        }
+        OptionalDict::from_inner(Array::from_fn(|_| iter.next().unwrap().map(&mut f)))
     }
 
     pub fn try_map<F, U, E>(self, mut f: F) -> Result<OptionalDict<K, U>, E>
@@ -69,59 +66,52 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         F: FnMut(V) -> Result<U, E>,
     {
         let mut iter = self.inner.into_iter();
-        Ok(OptionalDict {
-            inner: Array::try_from_fn(|_| iter.next().unwrap().map(&mut f).transpose())?,
-            phantom: PhantomData,
-        })
+        Ok(OptionalDict::from_inner(Array::try_from_fn(|_| {
+            iter.next().unwrap().map(&mut f).transpose()
+        })?))
     }
 
     pub fn each_ref(&self) -> OptionalDict<K, &V> {
         let mut iter = self.inner.as_ref().iter();
-        OptionalDict {
-            inner: Array::from_fn(|_| iter.next().unwrap().as_ref()),
-            phantom: PhantomData,
-        }
+        OptionalDict::from_inner(Array::from_fn(|_| iter.next().unwrap().as_ref()))
     }
 
     pub fn each_mut(&mut self) -> OptionalDict<K, &mut V> {
         let mut iter = self.inner.as_mut().iter_mut();
-        OptionalDict {
-            inner: Array::from_fn(|_| iter.next().unwrap().as_mut()),
-            phantom: PhantomData,
-        }
+        OptionalDict::from_inner(Array::from_fn(|_| iter.next().unwrap().as_mut()))
     }
 
     pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
         let is_filled = self.inner.as_ref().iter().all(|v| v.is_some());
         if is_filled {
             let mut iter = self.inner.into_iter();
-            Ok(RequiredDict {
-                inner: Array::from_fn(|_| iter.next().unwrap().unwrap()),
-                phantom: PhantomData,
-            })
+            Ok(RequiredDict::from_inner(Array::from_fn(|_| {
+                iter.next().unwrap().unwrap()
+            })))
         } else {
             Err(self)
         }
     }
 }
 
+impl<K: DictKey, V> From<RequiredDict<K, Option<V>>> for OptionalDict<K, V> {
+    #[inline]
+    fn from(dict: RequiredDict<K, Option<V>>) -> Self {
+        Self::from_inner(dict.inner)
+    }
+}
+
 impl<K: DictKey, V> Default for OptionalDict<K, V> {
     #[inline]
     fn default() -> Self {
-        Self {
-            inner: Array::from_fn(|_| None),
-            phantom: PhantomData,
-        }
+        Self::from_inner(Array::from_fn(|_| None))
     }
 }
 
 impl<K: DictKey, V: Clone> Clone for OptionalDict<K, V> {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            inner: Array::from_fn(|i| self.inner.as_ref()[i].clone()),
-            phantom: PhantomData,
-        }
+        Self::from_inner(Array::from_fn(|i| self.inner.as_ref()[i].clone()))
     }
 }
 
