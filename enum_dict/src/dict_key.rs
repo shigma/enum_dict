@@ -26,13 +26,32 @@ impl<const N: usize, T> Array<T> for [T; N] {
         F: FnMut(usize) -> Result<T, E>,
     {
         let mut arr = MaybeUninit::<Self>::uninit();
-        unsafe {
-            let ptr = arr.as_mut_ptr() as *mut T;
-            for i in 0..N {
+        let ptr = arr.as_mut_ptr() as *mut T;
+
+        // Guard to drop initialized elements on panic/error
+        struct Guard<T> {
+            ptr: *mut T,
+            initialized: usize,
+        }
+
+        impl<T> Drop for Guard<T> {
+            fn drop(&mut self) {
+                let slice = core::ptr::slice_from_raw_parts_mut(self.ptr, self.initialized);
+                unsafe { core::ptr::drop_in_place(slice) }
+            }
+        }
+
+        let mut guard = Guard { ptr, initialized: 0 };
+
+        for i in 0..N {
+            unsafe {
                 ptr.add(i).write(f(i)?);
             }
-            Ok(arr.assume_init())
+            guard.initialized += 1;
         }
+
+        core::mem::forget(guard);
+        Ok(unsafe { arr.assume_init() })
     }
 }
 
