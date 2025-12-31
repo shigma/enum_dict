@@ -52,5 +52,5 @@ fn test_validate() {
     }"#;
 
     let err = serde_json::from_str::<Data>(json).unwrap_err();
-    assert_eq!(err.to_string(), "Missing keys: A, B at line 2 column 22");
+    assert_eq!(err.to_string(), "Missing keys: a, b at line 2 column 22");
 }

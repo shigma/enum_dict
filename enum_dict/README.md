@@ -26,29 +26,27 @@ enum Color {
     Blue,
 }
 
-fn main() {
-    // `RequiredDict` - all keys must have values
-    let mut colors = required_dict! {
-        Color::Red => "#FF0000",
-        Color::Green => "#00FF00",
-        Color::Blue => "#0000FF",
-    };
+// `RequiredDict` - all keys must have values
+let mut colors = required_dict! {
+    Color::Red => "#FF0000",
+    Color::Green => "#00FF00",
+    Color::Blue => "#0000FF",
+};
 
-    // Direct indexing - no `.get()` needed!
-    println!("Red hex: {}", colors[Color::Red]);
+// Direct indexing - no `.get()` needed!
+println!("Red hex: {}", colors[Color::Red]);
 
-    // Mutable access
-    colors[Color::Red] = "#FF0001";
+// Mutable access
+colors[Color::Red] = "#FF0001";
 
-    // `OptionalDict` - keys may or may not have values
-    let favorite_colors = optional_dict! {
-        Color::Blue => "Sky Blue",
-    };
+// `OptionalDict` - keys may or may not have values
+let favorite_colors = optional_dict! {
+    Color::Blue => "Sky Blue",
+};
 
-    // Returns `Option<&str>`
-    if let Some(favorite) = favorite_colors[Color::Blue] {
-        println!("Favorite blue: {}", favorite);
-    }
+// Returns `Option<&str>`
+if let Some(favorite) = favorite_colors[Color::Blue] {
+    println!("Favorite blue: {}", favorite);
 }
 ```
 

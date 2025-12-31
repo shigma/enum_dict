@@ -44,5 +44,5 @@ pub trait DictKey {
 
     fn from_index(index: usize) -> Self;
 
-    fn into_index(self) -> usize;
+    fn as_index(&self) -> usize;
 }

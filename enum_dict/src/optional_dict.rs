@@ -154,14 +154,14 @@ impl<K: DictKey, V> Index<K> for OptionalDict<K, V> {
 
     #[inline]
     fn index(&self, key: K) -> &Self::Output {
-        &self.inner.as_ref()[key.into_index()]
+        &self.inner.as_ref()[key.as_index()]
     }
 }
 
 impl<K: DictKey, V> IndexMut<K> for OptionalDict<K, V> {
     #[inline]
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
-        &mut self.inner.as_mut()[key.into_index()]
+        &mut self.inner.as_mut()[key.as_index()]
     }
 }
 

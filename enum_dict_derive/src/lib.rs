@@ -88,7 +88,8 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
     }
 
     let mut ident_names = TokenStream2::new();
-    let mut match_arms = TokenStream2::new();
+    let mut from_index_arms = TokenStream2::new();
+    let mut as_index_arms = TokenStream2::new();
     let variant_count = data.variants.len();
     for (index, variant) in data.variants.into_iter().enumerate() {
         let syn::Fields::Unit = &variant.fields else {
@@ -138,7 +139,8 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
             }
         }
 
-        match_arms.extend(quote! { #index => Self::#ident, });
+        from_index_arms.extend(quote! { #index => Self::#ident, });
+        as_index_arms.extend(quote! { Self::#ident => #index, });
         ident_names.extend(quote! { #name, });
     }
 
@@ -156,14 +158,16 @@ pub(crate) fn derive_dict_key_inner(input: TokenStream2) -> TokenStream2 {
 
             fn from_index(index: usize) -> Self {
                 match index {
-                    #match_arms
+                    #from_index_arms
                     _ => panic!("invalid index for DictKey"),
                 }
             }
 
             #[inline]
-            fn into_index(self) -> usize {
-                self as usize
+            fn as_index(&self) -> usize {
+                match self {
+                    #as_index_arms
+                }
             }
         }
     }
