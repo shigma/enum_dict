@@ -181,6 +181,24 @@ impl<K: DictKey, V: Display> Display for RequiredDict<K, V> {
     }
 }
 
+#[macro_export]
+macro_rules! required_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::RequiredDict::from_fn(|k| {
+            match k { $($key => $value),* }
+        })
+    }};
+}
+
+#[macro_export]
+macro_rules! try_required_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::RequiredDict::try_from_fn(|k| {
+            Ok(match k { $($key => $value),* })
+        })
+    }};
+}
+
 #[cfg(feature = "serde")]
 mod serde_impl {
     use serde::ser::SerializeMap;
@@ -227,20 +245,49 @@ mod serde_impl {
     }
 }
 
-#[macro_export]
-macro_rules! required_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::RequiredDict::from_fn(|k| {
-            match k { $($key => $value),* }
-        })
-    }};
-}
+#[cfg(feature = "std")]
+mod std_impl {
+    extern crate std;
 
-#[macro_export]
-macro_rules! try_required_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::RequiredDict::try_from_fn(|k| {
-            Ok(match k { $($key => $value),* })
-        })
-    }};
+    use std::collections::{BTreeMap, HashMap};
+
+    use super::*;
+
+    pub struct MissingKey<K>(K);
+
+    impl<K: DictKey> core::fmt::Debug for MissingKey<K> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "MissingKey({})", K::VARIANTS[self.0.as_index()])
+        }
+    }
+
+    impl<K: DictKey> core::fmt::Display for MissingKey<K> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(
+                f,
+                "Key {} missing when converting to RequiredDict",
+                K::VARIANTS[self.0.as_index()]
+            )
+        }
+    }
+
+    impl<K: DictKey> core::error::Error for MissingKey<K> {}
+
+    impl<K: DictKey + Eq + Hash, V> TryFrom<HashMap<K, V>> for RequiredDict<K, V> {
+        type Error = MissingKey<K>;
+
+        #[inline]
+        fn try_from(mut map: HashMap<K, V>) -> Result<Self, Self::Error> {
+            RequiredDict::try_from_fn(|key| map.remove(&key).ok_or(MissingKey(key)))
+        }
+    }
+
+    impl<K: DictKey + Ord, V> TryFrom<BTreeMap<K, V>> for RequiredDict<K, V> {
+        type Error = MissingKey<K>;
+
+        #[inline]
+        fn try_from(mut map: BTreeMap<K, V>) -> Result<Self, Self::Error> {
+            RequiredDict::try_from_fn(|key| map.remove(&key).ok_or(MissingKey(key)))
+        }
+    }
 }

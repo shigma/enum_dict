@@ -11,8 +11,9 @@ documentation = "https://docs.rs/enum-dict"
 [features]
 default = ["derive"]
 derive = ["dep:enum_dict_derive"]
-full = ["derive", "serde"]
+full = ["std", "derive", "serde"]
 serde = ["dep:serde"]
+std = []
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }

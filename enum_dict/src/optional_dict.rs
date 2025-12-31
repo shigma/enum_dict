@@ -197,6 +197,30 @@ impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
     }
 }
 
+#[macro_export]
+macro_rules! optional_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::OptionalDict::from_fn(|k| {
+            match k {
+                $($key => Some($value)),* ,
+                _ => None,
+            }
+        })
+    }};
+}
+
+#[macro_export]
+macro_rules! try_optional_dict {
+    ($($key:pat => $value:expr),* $(,)?) => {{
+        $crate::OptionalDict::try_from_fn(|k| {
+            Ok(match k {
+                $($key => Some($value)),* ,
+                _ => None,
+            })
+        })
+    }};
+}
+
 #[cfg(feature = "serde")]
 mod serde_impl {
     use serde::de::{DeserializeSeed, MapAccess, Visitor};
@@ -280,26 +304,25 @@ mod serde_impl {
     }
 }
 
-#[macro_export]
-macro_rules! optional_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::OptionalDict::from_fn(|k| {
-            match k {
-                $($key => Some($value)),* ,
-                _ => None,
-            }
-        })
-    }};
-}
+#[cfg(feature = "std")]
+mod std_impl {
+    extern crate std;
 
-#[macro_export]
-macro_rules! try_optional_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::OptionalDict::try_from_fn(|k| {
-            Ok(match k {
-                $($key => Some($value)),* ,
-                _ => None,
-            })
-        })
-    }};
+    use std::collections::{BTreeMap, HashMap};
+
+    use super::*;
+
+    impl<K: DictKey + Eq + Hash, V> From<HashMap<K, V>> for OptionalDict<K, V> {
+        #[inline]
+        fn from(mut map: HashMap<K, V>) -> Self {
+            OptionalDict::from_fn(|key| map.remove(&key))
+        }
+    }
+
+    impl<K: DictKey + Ord, V> From<BTreeMap<K, V>> for OptionalDict<K, V> {
+        #[inline]
+        fn from(mut map: BTreeMap<K, V>) -> Self {
+            OptionalDict::from_fn(|key| map.remove(&key))
+        }
+    }
 }
