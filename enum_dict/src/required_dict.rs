@@ -1,6 +1,8 @@
 use core::fmt::{Debug, Display};
 use core::hash::{Hash, Hasher};
+use core::iter::FusedIterator;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::ops::{Index, IndexMut};
 
 use crate::dict_key::Array;
@@ -178,6 +180,102 @@ impl<K: DictKey, V: Display> Display for RequiredDict<K, V> {
             is_first = false;
         }
         write!(f, "}}")
+    }
+}
+
+pub struct IntoIter<K: DictKey, V> {
+    inner: K::Array<MaybeUninit<V>>,
+    start: usize,
+    end: usize,
+}
+
+impl<K: DictKey, V> From<RequiredDict<K, V>> for IntoIter<K, V> {
+    #[inline]
+    fn from(dict: RequiredDict<K, V>) -> Self {
+        let len = dict.inner.as_ref().len();
+        // Safety: MaybeUninit<V> has the same layout as V,
+        // so transmuting [V; N] to [MaybeUninit<V>; N] is safe.
+        // We use ptr::read to avoid dropping the original array.
+        let inner = unsafe {
+            let ptr = &dict.inner as *const K::Array<V> as *const K::Array<MaybeUninit<V>>;
+            core::mem::forget(dict);
+            ptr.read()
+        };
+        Self {
+            inner,
+            start: 0,
+            end: len,
+        }
+    }
+}
+
+impl<K: DictKey, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start >= self.end {
+            return None;
+        }
+        let index = self.start;
+        self.start += 1;
+        // Safety: index is in [0, end), so it's valid and initialized
+        let value = unsafe { self.inner.as_ref()[index].assume_init_read() };
+        Some((K::from_index(index), value))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.end - self.start;
+        (len, Some(len))
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.len()
+    }
+}
+
+impl<K: DictKey, V> ExactSizeIterator for IntoIter<K, V> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.end - self.start
+    }
+}
+
+impl<K: DictKey, V> FusedIterator for IntoIter<K, V> {}
+
+impl<K: DictKey, V> DoubleEndedIterator for IntoIter<K, V> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start >= self.end {
+            return None;
+        }
+        self.end -= 1;
+        let index = self.end;
+        // Safety: index is in [start, original_end), so it's valid and initialized
+        let value = unsafe { self.inner.as_ref()[index].assume_init_read() };
+        Some((K::from_index(index), value))
+    }
+}
+
+impl<K: DictKey, V> Drop for IntoIter<K, V> {
+    fn drop(&mut self) {
+        // Drop remaining elements that haven't been yielded
+        for i in self.start..self.end {
+            // Safety: elements in [start, end) are still initialized
+            unsafe {
+                self.inner.as_mut()[i].assume_init_drop();
+            }
+        }
+    }
+}
+
+impl<K: DictKey, V> IntoIterator for RequiredDict<K, V> {
+    type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.into()
     }
 }
 

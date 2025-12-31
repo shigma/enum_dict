@@ -1,5 +1,6 @@
 use core::fmt::{Debug, Display};
 use core::hash::{Hash, Hasher};
+use core::iter::FusedIterator;
 use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};
 
@@ -194,6 +195,76 @@ impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
             is_first = false;
         }
         write!(f, "}}")
+    }
+}
+
+pub struct IntoIter<K: DictKey, V> {
+    inner: crate::required_dict::IntoIter<K, Option<V>>,
+    len: usize,
+}
+
+impl<K: DictKey, V> From<OptionalDict<K, V>> for IntoIter<K, V> {
+    fn from(dict: OptionalDict<K, V>) -> Self {
+        let len = dict.len();
+        Self {
+            inner: RequiredDict::from(dict).into(),
+            len,
+        }
+    }
+}
+
+impl<K: DictKey, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for (key, value) in &mut self.inner {
+            if let Some(value) = value {
+                self.len -= 1;
+                return Some((key, value));
+            }
+        }
+        None
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.len
+    }
+}
+
+impl<K: DictKey, V> DoubleEndedIterator for IntoIter<K, V> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        while let Some((key, value)) = self.inner.next_back() {
+            if let Some(value) = value {
+                self.len -= 1;
+                return Some((key, value));
+            }
+        }
+        None
+    }
+}
+
+impl<K: DictKey, V> ExactSizeIterator for IntoIter<K, V> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<K: DictKey, V> FusedIterator for IntoIter<K, V> {}
+
+impl<K: DictKey, V> IntoIterator for OptionalDict<K, V> {
+    type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.into()
     }
 }
 

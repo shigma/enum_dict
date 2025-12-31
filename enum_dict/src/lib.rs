@@ -2,8 +2,8 @@
 #![no_std]
 
 mod dict_key;
-mod optional_dict;
-mod required_dict;
+pub(crate) mod optional_dict;
+pub(crate) mod required_dict;
 
 pub use dict_key::DictKey;
 #[cfg(feature = "derive")]
