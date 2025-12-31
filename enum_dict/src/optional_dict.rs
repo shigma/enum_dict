@@ -187,7 +187,7 @@ impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
             let Some(value) = value else {
                 continue;
             };
-            if is_first {
+            if !is_first {
                 write!(f, ", ")?;
             }
             write!(f, "{}: {}", K::VARIANTS[index], value)?;

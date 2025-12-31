@@ -171,7 +171,7 @@ impl<K: DictKey, V: Display> Display for RequiredDict<K, V> {
         write!(f, "{{")?;
         let mut is_first = true;
         for (index, value) in self.inner.as_ref().iter().enumerate() {
-            if is_first {
+            if !is_first {
                 write!(f, ", ")?;
             }
             write!(f, "{}: {}", K::VARIANTS[index], value)?;

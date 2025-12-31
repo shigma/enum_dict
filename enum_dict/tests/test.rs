@@ -36,6 +36,9 @@ fn test_serde() {
     assert_eq!(data.optional[Key::A], Some(3));
     assert_eq!(data.optional[Key::B], None);
 
+    assert_eq!(data.required.to_string(), "{a: 1, b: 2}");
+    assert_eq!(data.optional.to_string(), "{a: 3}");
+
     assert_eq!(
         serde_json::to_string(&data).unwrap(),
         r#"{"required":{"a":1,"b":2},"optional":{"a":3}}"#
