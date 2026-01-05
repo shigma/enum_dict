@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq, DictKey)]
 #[enum_dict(rename_all = "lowercase")]
 enum Key {
-    A,
-    B,
+    A = 1,
+    B = 0,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

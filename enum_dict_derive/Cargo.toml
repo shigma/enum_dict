@@ -11,8 +11,19 @@ documentation = "https://docs.rs/enum_dict_derive"
 [lib]
 proc-macro = true
 
+[[test]]
+name = "input"
+path = "fixtures/mod.rs"
+
 [dependencies]
 heck = "0.5.0"
 proc-macro2 = "1.0.103"
 quote = "1.0.40"
 syn = { version = "2.0.106" }
+
+[dev-dependencies]
+enum_dict = { path = "../enum_dict" }
+macro_expand = "0.1.2"
+pretty_assertions = "1.4.1"
+prettyplease = "0.2.37"
+walkdir = "2.5.0"
