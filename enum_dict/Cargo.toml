@@ -1,6 +1,6 @@
 [package]
 name = "enum_dict"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2024"
 license = "MIT"
 authors = ["Shigma <shigma10826@gmail.com>"]
@@ -17,7 +17,7 @@ std = []
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"], optional = true }
-enum_dict_derive = { version = "0.5.0", path = "../enum_dict_derive", optional = true }
+enum_dict_derive = { version = "0.6.0", path = "../enum_dict_derive", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
