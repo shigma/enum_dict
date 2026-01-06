@@ -282,7 +282,7 @@ impl<K: DictKey, V> IntoIterator for RequiredDict<K, V> {
 #[macro_export]
 macro_rules! required_dict {
     ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::RequiredDict::from_fn(|k| {
+        $crate::RequiredDict::from_fn(move |k| {
             match k { $($key => $value),* }
         })
     }};
@@ -291,7 +291,7 @@ macro_rules! required_dict {
 #[macro_export]
 macro_rules! try_required_dict {
     ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::RequiredDict::try_from_fn(|k| {
+        $crate::RequiredDict::try_from_fn(move |k| {
             Ok(match k { $($key => $value),* })
         })
     }};

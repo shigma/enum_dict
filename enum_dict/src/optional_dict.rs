@@ -271,7 +271,7 @@ impl<K: DictKey, V> IntoIterator for OptionalDict<K, V> {
 #[macro_export]
 macro_rules! optional_dict {
     ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::OptionalDict::from_fn(|k| {
+        $crate::OptionalDict::from_fn(move |k| {
             match k {
                 $($key => Some($value)),* ,
                 _ => None,
@@ -283,7 +283,7 @@ macro_rules! optional_dict {
 #[macro_export]
 macro_rules! try_optional_dict {
     ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::OptionalDict::try_from_fn(|k| {
+        $crate::OptionalDict::try_from_fn(move |k| {
             Ok(match k {
                 $($key => Some($value)),* ,
                 _ => None,
