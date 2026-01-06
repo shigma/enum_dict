@@ -1,13 +1,16 @@
 use core::fmt::{Debug, Display};
 use core::hash::{Hash, Hasher};
-use core::iter::FusedIterator;
+use core::iter::{Enumerate, FusedIterator};
 use core::marker::PhantomData;
 use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::{Index, IndexMut};
 
 use crate::dict_key::Array;
-use crate::iter::Values;
 use crate::{DictKey, OptionalDict};
+
+type Values<'a, K, V> = crate::iter::Values<Iter<'a, K, V>>;
+type ValuesMut<'a, K, V> = crate::iter::Values<IterMut<'a, K, V>>;
+type IntoValues<K, V> = crate::iter::Values<IntoIter<K, V>>;
 
 /// A dictionary that requires all keys to have values
 #[repr(transparent)]
@@ -84,8 +87,28 @@ impl<K: DictKey, V> RequiredDict<K, V> {
     }
 
     #[inline]
-    pub fn into_values(self) -> Values<IntoIter<K, V>> {
-        Values(self.into_iter())
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        self.into_iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+        self.into_iter()
+    }
+
+    #[inline]
+    pub fn values(&self) -> Values<'_, K, V> {
+        self.into_iter().into()
+    }
+
+    #[inline]
+    pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+        self.into_iter().into()
+    }
+
+    #[inline]
+    pub fn into_values(self) -> IntoValues<K, V> {
+        self.into_iter().into()
     }
 
     #[inline]
@@ -250,8 +273,6 @@ impl<K: DictKey, V> ExactSizeIterator for IntoIter<K, V> {
     }
 }
 
-impl<K: DictKey, V> FusedIterator for IntoIter<K, V> {}
-
 impl<K: DictKey, V> DoubleEndedIterator for IntoIter<K, V> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start >= self.end {
@@ -265,6 +286,8 @@ impl<K: DictKey, V> DoubleEndedIterator for IntoIter<K, V> {
     }
 }
 
+impl<K: DictKey, V> FusedIterator for IntoIter<K, V> {}
+
 impl<K: DictKey, V> Drop for IntoIter<K, V> {
     fn drop(&mut self) {
         // Drop remaining elements that haven't been yielded
@@ -277,6 +300,120 @@ impl<K: DictKey, V> Drop for IntoIter<K, V> {
     }
 }
 
+pub struct Iter<'a, K: DictKey, V> {
+    inner: Enumerate<core::slice::Iter<'a, V>>,
+    phantom: PhantomData<K>,
+}
+
+impl<'a, K: DictKey, V> From<&'a [V]> for Iter<'a, K, V> {
+    #[inline]
+    fn from(slice: &'a [V]) -> Self {
+        Self {
+            inner: slice.iter().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, K: DictKey, V> Iterator for Iter<'a, K, V> {
+    type Item = (K, &'a V);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (index, value) = self.inner.next()?;
+        Some((K::from_index(index), value))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.inner.count()
+    }
+}
+
+impl<K: DictKey, V> ExactSizeIterator for Iter<'_, K, V> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl<K: DictKey, V> DoubleEndedIterator for Iter<'_, K, V> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let (index, value) = self.inner.next_back()?;
+        Some((K::from_index(index), value))
+    }
+}
+
+impl<K: DictKey, V> FusedIterator for Iter<'_, K, V> {}
+
+impl<K: DictKey, V> Clone for Iter<'_, K, V> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+pub struct IterMut<'a, K: DictKey, V> {
+    inner: Enumerate<core::slice::IterMut<'a, V>>,
+    phantom: PhantomData<K>,
+}
+
+impl<'a, K: DictKey, V> From<&'a mut [V]> for IterMut<'a, K, V> {
+    #[inline]
+    fn from(slice: &'a mut [V]) -> Self {
+        Self {
+            inner: slice.iter_mut().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a, K: DictKey, V> Iterator for IterMut<'a, K, V> {
+    type Item = (K, &'a mut V);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (index, value) = self.inner.next()?;
+        Some((K::from_index(index), value))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.inner.count()
+    }
+}
+
+impl<K: DictKey, V> ExactSizeIterator for IterMut<'_, K, V> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl<K: DictKey, V> DoubleEndedIterator for IterMut<'_, K, V> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let (index, value) = self.inner.next_back()?;
+        Some((K::from_index(index), value))
+    }
+}
+
+impl<K: DictKey, V> FusedIterator for IterMut<'_, K, V> {}
+
 impl<K: DictKey, V> IntoIterator for RequiredDict<K, V> {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V>;
@@ -284,6 +421,26 @@ impl<K: DictKey, V> IntoIterator for RequiredDict<K, V> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.into()
+    }
+}
+
+impl<'a, K: DictKey, V> IntoIterator for &'a RequiredDict<K, V> {
+    type Item = (K, &'a V);
+    type IntoIter = Iter<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.as_ref().into()
+    }
+}
+
+impl<'a, K: DictKey, V> IntoIterator for &'a mut RequiredDict<K, V> {
+    type Item = (K, &'a mut V);
+    type IntoIter = IterMut<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.as_mut().into()
     }
 }
 

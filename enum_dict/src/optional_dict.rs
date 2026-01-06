@@ -6,8 +6,15 @@ use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::{Index, IndexMut};
 
 use crate::dict_key::Array;
-use crate::iter::Values;
 use crate::{DictKey, RequiredDict};
+
+type Iter<'a, K, V> = OptionalIter<crate::required_dict::Iter<'a, K, Option<V>>>;
+type IterMut<'a, K, V> = OptionalIter<crate::required_dict::IterMut<'a, K, Option<V>>>;
+type IntoIter<K, V> = OptionalIter<crate::required_dict::IntoIter<K, Option<V>>>;
+
+type Values<'a, K, V> = crate::iter::Values<Iter<'a, K, V>>;
+type ValuesMut<'a, K, V> = crate::iter::Values<IterMut<'a, K, V>>;
+type IntoValues<K, V> = crate::iter::Values<IntoIter<K, V>>;
 
 /// A dictionary where keys may or may not have values
 #[repr(transparent)]
@@ -90,8 +97,28 @@ impl<K: DictKey, V> OptionalDict<K, V> {
     }
 
     #[inline]
-    pub fn into_values(self) -> Values<IntoIter<K, V>> {
-        Values(self.into_iter())
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        self.into_iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+        self.into_iter()
+    }
+
+    #[inline]
+    pub fn values(&self) -> Values<'_, K, V> {
+        self.into_iter().into()
+    }
+
+    #[inline]
+    pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+        self.into_iter().into()
+    }
+
+    #[inline]
+    pub fn into_values(self) -> IntoValues<K, V> {
+        self.into_iter().into()
     }
 
     pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
@@ -210,28 +237,55 @@ impl<K: DictKey, V: Display> Display for OptionalDict<K, V> {
     }
 }
 
-pub struct IntoIter<K: DictKey, V> {
-    inner: crate::required_dict::IntoIter<K, Option<V>>,
-    len: usize,
+trait IntoOption {
+    type Value;
+
+    fn into_option(self) -> Option<Self::Value>;
 }
 
-impl<K: DictKey, V> From<OptionalDict<K, V>> for IntoIter<K, V> {
+impl<T> IntoOption for Option<T> {
+    type Value = T;
+
     #[inline]
-    fn from(dict: OptionalDict<K, V>) -> Self {
-        let len = dict.len();
-        Self {
-            inner: RequiredDict::from(dict).into(),
-            len,
-        }
+    fn into_option(self) -> Option<T> {
+        self
     }
 }
 
-impl<K: DictKey, V> Iterator for IntoIter<K, V> {
+impl<'a, T> IntoOption for &'a Option<T> {
+    type Value = &'a T;
+
+    #[inline]
+    fn into_option(self) -> Option<&'a T> {
+        self.as_ref()
+    }
+}
+
+impl<'a, T> IntoOption for &'a mut Option<T> {
+    type Value = &'a mut T;
+
+    #[inline]
+    fn into_option(self) -> Option<&'a mut T> {
+        self.as_mut()
+    }
+}
+
+pub struct OptionalIter<I> {
+    inner: I,
+    len: usize,
+}
+
+impl<I, K, V, T> Iterator for OptionalIter<I>
+where
+    I: Iterator<Item = (K, T)>,
+    T: IntoOption<Value = V>,
+{
     type Item = (K, V);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         for (key, value) in &mut self.inner {
-            if let Some(value) = value {
+            if let Some(value) = value.into_option() {
                 self.len -= 1;
                 return Some((key, value));
             }
@@ -250,10 +304,26 @@ impl<K: DictKey, V> Iterator for IntoIter<K, V> {
     }
 }
 
-impl<K: DictKey, V> DoubleEndedIterator for IntoIter<K, V> {
+impl<I, K, V, T> ExactSizeIterator for OptionalIter<I>
+where
+    I: Iterator<Item = (K, T)>,
+    T: IntoOption<Value = V>,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<I, K, V, T> DoubleEndedIterator for OptionalIter<I>
+where
+    I: DoubleEndedIterator<Item = (K, T)>,
+    T: IntoOption<Value = V>,
+{
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         while let Some((key, value)) = self.inner.next_back() {
-            if let Some(value) = value {
+            if let Some(value) = value.into_option() {
                 self.len -= 1;
                 return Some((key, value));
             }
@@ -262,14 +332,12 @@ impl<K: DictKey, V> DoubleEndedIterator for IntoIter<K, V> {
     }
 }
 
-impl<K: DictKey, V> ExactSizeIterator for IntoIter<K, V> {
-    #[inline]
-    fn len(&self) -> usize {
-        self.len
-    }
+impl<I, K, V, T> FusedIterator for OptionalIter<I>
+where
+    I: FusedIterator<Item = (K, T)>,
+    T: IntoOption<Value = V>,
+{
 }
-
-impl<K: DictKey, V> FusedIterator for IntoIter<K, V> {}
 
 impl<K: DictKey, V> IntoIterator for OptionalDict<K, V> {
     type Item = (K, V);
@@ -277,7 +345,39 @@ impl<K: DictKey, V> IntoIterator for OptionalDict<K, V> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.into()
+        let len = self.len();
+        OptionalIter {
+            inner: RequiredDict::from(self).into_iter(),
+            len,
+        }
+    }
+}
+
+impl<'a, K: DictKey, V> IntoIterator for &'a OptionalDict<K, V> {
+    type Item = (K, &'a V);
+    type IntoIter = Iter<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let len = self.len();
+        OptionalIter {
+            inner: self.inner.as_ref().into(),
+            len,
+        }
+    }
+}
+
+impl<'a, K: DictKey, V> IntoIterator for &'a mut OptionalDict<K, V> {
+    type Item = (K, &'a mut V);
+    type IntoIter = IterMut<'a, K, V>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let len = self.len();
+        OptionalIter {
+            inner: self.inner.as_mut().into(),
+            len,
+        }
     }
 }
 
