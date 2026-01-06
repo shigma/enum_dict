@@ -2,12 +2,14 @@ use core::fmt::{Debug, Display};
 use core::hash::{Hash, Hasher};
 use core::iter::FusedIterator;
 use core::marker::PhantomData;
+use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::{Index, IndexMut};
 
 use crate::dict_key::Array;
 use crate::{DictKey, RequiredDict};
 
 /// A dictionary where keys may or may not have values
+#[repr(transparent)]
 pub struct OptionalDict<K: DictKey, V> {
     pub(crate) inner: K::Array<Option<V>>,
     pub(crate) phantom: PhantomData<K>,
@@ -265,6 +267,21 @@ impl<K: DictKey, V> IntoIterator for OptionalDict<K, V> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.into()
+    }
+}
+
+impl<K: DictKey, V> OptionalDict<K, MaybeUninit<V>> {
+    /// Transpose `OptionalDict<K, MaybeUninit<V>>` into `MaybeUninit<OptionalDict<K, V>>`.
+    #[inline]
+    pub fn transpose(self) -> MaybeUninit<OptionalDict<K, V>> {
+        // SAFETY: `MaybeUninit<OptionalDict<K, V>>` and `OptionalDict<K, MaybeUninit<V>>`
+        // have the same layout because:
+        // 1. `OptionalDict<K, V>` is `#[repr(transparent)]` over `K::Array<Option<V>>`
+        // 2. `K::Array<Option<V>>` is effectively `[Option<V>; N]`
+        // 3. `[Option<V>; N]` has the same layout as `[MaybeUninit<Option<V>>; N]`
+        let this = ManuallyDrop::new(self);
+        let ptr = &*this as *const Self as *const MaybeUninit<_>;
+        unsafe { ptr.read() }
     }
 }
 

@@ -2,13 +2,14 @@ use core::fmt::{Debug, Display};
 use core::hash::{Hash, Hasher};
 use core::iter::FusedIterator;
 use core::marker::PhantomData;
-use core::mem::MaybeUninit;
+use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::{Index, IndexMut};
 
 use crate::dict_key::Array;
 use crate::{DictKey, OptionalDict};
 
 /// A dictionary that requires all keys to have values
+#[repr(transparent)]
 pub struct RequiredDict<K: DictKey, V> {
     pub(crate) inner: K::Array<V>,
     pub(crate) phantom: PhantomData<K>,
@@ -193,14 +194,10 @@ impl<K: DictKey, V> From<RequiredDict<K, V>> for IntoIter<K, V> {
     #[inline]
     fn from(dict: RequiredDict<K, V>) -> Self {
         let len = dict.inner.as_ref().len();
-        // Safety: MaybeUninit<V> has the same layout as V,
-        // so transmuting [V; N] to [MaybeUninit<V>; N] is safe.
-        // We use ptr::read to avoid dropping the original array.
-        let inner = unsafe {
-            let ptr = &dict.inner as *const K::Array<V> as *const K::Array<MaybeUninit<V>>;
-            core::mem::forget(dict);
-            ptr.read()
-        };
+        // SAFETY: `K::Array<V>` is effectively `[V; N]`, and `[V; N]` has the same layout as `[MaybeUninit<V>; N]`.
+        let inner = ManuallyDrop::new(dict.inner);
+        let ptr = &*inner as *const K::Array<V> as *const K::Array<MaybeUninit<V>>;
+        let inner = unsafe { ptr.read() };
         Self {
             inner,
             start: 0,
@@ -276,6 +273,21 @@ impl<K: DictKey, V> IntoIterator for RequiredDict<K, V> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.into()
+    }
+}
+
+impl<K: DictKey, V> RequiredDict<K, MaybeUninit<V>> {
+    /// Transpose `RequiredDict<K, MaybeUninit<V>>` into `MaybeUninit<RequiredDict<K, V>>`.
+    #[inline]
+    pub fn transpose(self) -> MaybeUninit<RequiredDict<K, V>> {
+        // SAFETY: `MaybeUninit<RequiredDict<K, V>>` and `RequiredDict<K, MaybeUninit<V>>`
+        // have the same layout because:
+        // 1. `RequiredDict<K, V>` is `#[repr(transparent)]` over `K::Array<V>`
+        // 2. `K::Array<V>` is effectively `[V; N]`
+        // 3. `[V; N]` has the same layout as `[MaybeUninit<V>; N]`
+        let this = ManuallyDrop::new(self);
+        let ptr = &*this as *const Self as *const MaybeUninit<_>;
+        unsafe { ptr.read() }
     }
 }
 
