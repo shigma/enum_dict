@@ -1,6 +1,6 @@
 use core::iter::FusedIterator;
 
-pub struct Values<I>(pub I);
+pub struct Values<I>(I);
 
 impl<I> From<I> for Values<I> {
     #[inline]

@@ -538,31 +538,11 @@ mod serde_impl {
         }
     }
 
-    struct MissingKeys<K: DictKey, V>(OptionalDict<K, V>);
-
-    impl<K: DictKey, V> core::fmt::Display for MissingKeys<K, V> {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "Missing keys: ")?;
-            let mut is_first = true;
-            for (index, value) in self.0.inner.as_ref().iter().enumerate() {
-                if value.is_some() {
-                    continue;
-                }
-                if !is_first {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{}", K::VARIANTS[index])?;
-                is_first = false;
-            }
-            Ok(())
-        }
-    }
-
     impl<'de, K: DictKey, V: Deserialize<'de>> Deserialize<'de> for RequiredDict<K, V> {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             OptionalDict::<K, V>::deserialize(deserializer)?
                 .upgrade()
-                .map_err(|dict| serde::de::Error::custom(MissingKeys(dict)))
+                .map_err(serde::de::Error::custom)
         }
     }
 }

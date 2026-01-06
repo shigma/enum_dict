@@ -121,7 +121,7 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         self.into_iter().into()
     }
 
-    pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
+    pub fn upgrade(self) -> Result<RequiredDict<K, V>, MissingKeys<OptionalDict<K, V>>> {
         let is_filled = self.inner.as_ref().iter().all(|v| v.is_some());
         if is_filled {
             let mut iter = self.inner.into_iter();
@@ -129,10 +129,60 @@ impl<K: DictKey, V> OptionalDict<K, V> {
                 iter.next().unwrap().unwrap()
             })))
         } else {
-            Err(self)
+            Err(MissingKeys(self))
         }
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct MissingKeys<T>(T);
+
+impl<T> MissingKeys<T> {
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+struct DebugMissingKeys<T>(T);
+
+impl<K: DictKey, V> Debug for DebugMissingKeys<&'_ OptionalDict<K, V>> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut list = f.debug_list();
+        for (index, value) in self.0.inner.as_ref().iter().enumerate() {
+            if value.is_none() {
+                list.entry(&K::VARIANTS[index]);
+            }
+        }
+        list.finish()
+    }
+}
+
+impl<K: DictKey, V> Debug for MissingKeys<OptionalDict<K, V>> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("MissingKeys").field(&DebugMissingKeys(&self.0)).finish()
+    }
+}
+
+impl<K: DictKey, V> Display for MissingKeys<OptionalDict<K, V>> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Missing keys: ")?;
+        let mut is_first = true;
+        for (index, value) in self.0.inner.as_ref().iter().enumerate() {
+            if value.is_some() {
+                continue;
+            }
+            if !is_first {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", K::VARIANTS[index])?;
+            is_first = false;
+        }
+        Ok(())
+    }
+}
+
+impl<K: DictKey, V> core::error::Error for MissingKeys<OptionalDict<K, V>> {}
 
 impl<K: DictKey, V> From<RequiredDict<K, Option<V>>> for OptionalDict<K, V> {
     #[inline]
