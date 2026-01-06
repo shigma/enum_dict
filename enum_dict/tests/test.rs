@@ -1,4 +1,4 @@
-use enum_dict::{DictKey, OptionalDict, RequiredDict};
+use enum_dict::{DictKey, OptionalDict, RequiredDict, required_dict};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, DictKey)]
@@ -62,4 +62,16 @@ fn test_validate() {
 
     let err = serde_json::from_str::<Data>(json).unwrap_err();
     assert_eq!(err.to_string(), "Missing keys: a, b at line 2 column 22");
+}
+
+#[test]
+fn test_macro() {
+    let dict_1 = required_dict! {
+        Key::A | Key::B => 20,
+    };
+    let dict_2: RequiredDict<Key, _> = required_dict! {
+        Key::A => 20,
+        _ => 20,
+    };
+    assert_eq!(dict_1, dict_2);
 }

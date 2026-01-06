@@ -293,19 +293,33 @@ impl<K: DictKey, V> RequiredDict<K, MaybeUninit<V>> {
 
 #[macro_export]
 macro_rules! required_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::RequiredDict::from_fn(move |k| {
-            match k { $($key => $value),* }
-        })
-    }};
-}
+    ($($head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr),* $(,)?) => {{
+        // Compile-time exhaustiveness check
+        let _ = |key: _| match key {
+            $(
+                $head $(::$tail)*
+                $(|$or_head $(::$or_tail)*)*
+                => (),
+            )*
+        };
 
-#[macro_export]
-macro_rules! try_required_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::RequiredDict::try_from_fn(move |k| {
-            Ok(match k { $($key => $value),* })
-        })
+        let mut dict = $crate::RequiredDict::from_fn(|_| ::core::mem::MaybeUninit::uninit());
+        $(
+            dict[$head $(::$tail)*].write($value);
+            $(dict[$or_head $(::$or_tail)*].write($value);)*
+        )*
+        // Safety: exhaustiveness check ensures all variants are covered,
+        // so all `MaybeUninit` slots have been initialized via `write()`.
+        unsafe { dict.transpose().assume_init() }
+    }};
+
+    ($($head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr,)* _ => $default:expr $(,)?) => {{
+        let mut dict = $crate::RequiredDict::from_fn(|_| $default);
+        $(
+            dict[$head $(::$tail)*] = $value;
+            $(dict[$or_head $(::$or_tail)*] = $value;)*
+        )*
+        dict
     }};
 }
 

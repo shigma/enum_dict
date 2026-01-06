@@ -287,25 +287,22 @@ impl<K: DictKey, V> OptionalDict<K, MaybeUninit<V>> {
 
 #[macro_export]
 macro_rules! optional_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::OptionalDict::from_fn(move |k| {
-            match k {
-                $($key => Some($value)),* ,
-                _ => None,
-            }
-        })
+    ($($head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr),* $(,)?) => {{
+        let mut dict = $crate::OptionalDict::new();
+        $(
+            dict[$head $(::$tail)*] = Some($value);
+            $(dict[$or_head $(::$or_tail)*] = Some($value);)*
+        )*
+        dict
     }};
-}
 
-#[macro_export]
-macro_rules! try_optional_dict {
-    ($($key:pat => $value:expr),* $(,)?) => {{
-        $crate::OptionalDict::try_from_fn(move |k| {
-            Ok(match k {
-                $($key => Some($value)),* ,
-                _ => None,
-            })
-        })
+    ($($head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr,)* _ => $default:expr $(,)?) => {{
+        let mut dict = $crate::OptionalDict::from_fn(|_| Some($default));
+        $(
+            dict[$head $(::$tail)*] = Some($value);
+            $(dict[$or_head $(::$or_tail)*] = Some($value);)*
+        )*
+        dict
     }};
 }
 
