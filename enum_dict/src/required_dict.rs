@@ -6,6 +6,7 @@ use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::{Index, IndexMut};
 
 use crate::dict_key::Array;
+use crate::iter::Values;
 use crate::{DictKey, OptionalDict};
 
 /// A dictionary that requires all keys to have values
@@ -50,6 +51,7 @@ impl<K: DictKey, V> RequiredDict<K, V> {
         Ok(Self::from_inner(Array::try_from_fn(|i| f(K::from_index(i)))?))
     }
 
+    #[inline]
     pub fn map<F, U>(self, mut f: F) -> RequiredDict<K, U>
     where
         F: FnMut(V) -> U,
@@ -58,6 +60,7 @@ impl<K: DictKey, V> RequiredDict<K, V> {
         RequiredDict::from_inner(Array::from_fn(|_| f(iter.next().unwrap())))
     }
 
+    #[inline]
     pub fn try_map<F, U, E>(self, mut f: F) -> Result<RequiredDict<K, U>, E>
     where
         F: FnMut(V) -> Result<U, E>,
@@ -68,16 +71,24 @@ impl<K: DictKey, V> RequiredDict<K, V> {
         })?))
     }
 
+    #[inline]
     pub fn each_ref(&self) -> RequiredDict<K, &V> {
         let mut iter = self.inner.as_ref().iter();
         RequiredDict::from_inner(Array::from_fn(|_| iter.next().unwrap()))
     }
 
+    #[inline]
     pub fn each_mut(&mut self) -> RequiredDict<K, &mut V> {
         let mut iter = self.inner.as_mut().iter_mut();
         RequiredDict::from_inner(Array::from_fn(|_| iter.next().unwrap()))
     }
 
+    #[inline]
+    pub fn into_values(self) -> Values<IntoIter<K, V>> {
+        Values(self.into_iter())
+    }
+
+    #[inline]
     pub fn downgrade(self) -> OptionalDict<K, V> {
         let mut iter = self.inner.into_iter();
         OptionalDict::from_inner(Array::from_fn(|_| Some(iter.next().unwrap())))

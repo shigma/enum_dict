@@ -2,6 +2,7 @@
 #![no_std]
 
 mod dict_key;
+pub(crate) mod iter;
 pub(crate) mod optional_dict;
 pub(crate) mod required_dict;
 

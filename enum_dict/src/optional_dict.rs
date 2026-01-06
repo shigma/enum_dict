@@ -6,6 +6,7 @@ use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ops::{Index, IndexMut};
 
 use crate::dict_key::Array;
+use crate::iter::Values;
 use crate::{DictKey, RequiredDict};
 
 /// A dictionary where keys may or may not have values
@@ -56,6 +57,7 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         Ok(Self::from_inner(Array::try_from_fn(|i| f(K::from_index(i)))?))
     }
 
+    #[inline]
     pub fn map<F, U>(self, mut f: F) -> OptionalDict<K, U>
     where
         F: FnMut(V) -> U,
@@ -64,6 +66,7 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         OptionalDict::from_inner(Array::from_fn(|_| iter.next().unwrap().map(&mut f)))
     }
 
+    #[inline]
     pub fn try_map<F, U, E>(self, mut f: F) -> Result<OptionalDict<K, U>, E>
     where
         F: FnMut(V) -> Result<U, E>,
@@ -74,14 +77,21 @@ impl<K: DictKey, V> OptionalDict<K, V> {
         })?))
     }
 
+    #[inline]
     pub fn each_ref(&self) -> OptionalDict<K, &V> {
         let mut iter = self.inner.as_ref().iter();
         OptionalDict::from_inner(Array::from_fn(|_| iter.next().unwrap().as_ref()))
     }
 
+    #[inline]
     pub fn each_mut(&mut self) -> OptionalDict<K, &mut V> {
         let mut iter = self.inner.as_mut().iter_mut();
         OptionalDict::from_inner(Array::from_fn(|_| iter.next().unwrap().as_mut()))
+    }
+
+    #[inline]
+    pub fn into_values(self) -> Values<IntoIter<K, V>> {
+        Values(self.into_iter())
     }
 
     pub fn upgrade(self) -> Result<RequiredDict<K, V>, Self> {
@@ -206,6 +216,7 @@ pub struct IntoIter<K: DictKey, V> {
 }
 
 impl<K: DictKey, V> From<OptionalDict<K, V>> for IntoIter<K, V> {
+    #[inline]
     fn from(dict: OptionalDict<K, V>) -> Self {
         let len = dict.len();
         Self {
