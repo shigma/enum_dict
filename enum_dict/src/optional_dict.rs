@@ -339,6 +339,16 @@ where
 {
 }
 
+impl<I: Clone> Clone for OptionalIter<I> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            len: self.len,
+        }
+    }
+}
+
 impl<K: DictKey, V> IntoIterator for OptionalDict<K, V> {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V>;
@@ -385,7 +395,7 @@ impl<K: DictKey, V> OptionalDict<K, MaybeUninit<V>> {
     /// Transpose `OptionalDict<K, MaybeUninit<V>>` into `MaybeUninit<OptionalDict<K, V>>`.
     #[inline]
     pub fn transpose(self) -> MaybeUninit<OptionalDict<K, V>> {
-        // SAFETY: `MaybeUninit<OptionalDict<K, V>>` and `OptionalDict<K, MaybeUninit<V>>`
+        // Safety: `MaybeUninit<OptionalDict<K, V>>` and `OptionalDict<K, MaybeUninit<V>>`
         // have the same layout because:
         // 1. `OptionalDict<K, V>` is `#[repr(transparent)]` over `K::Array<Option<V>>`
         // 2. `K::Array<Option<V>>` is effectively `[Option<V>; N]`

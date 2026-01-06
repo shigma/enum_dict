@@ -224,11 +224,27 @@ pub struct IntoIter<K: DictKey, V> {
     end: usize,
 }
 
+impl<K: DictKey, V> IntoIter<K, V> {
+    #[inline]
+    pub fn as_slice(&self) -> &[V] {
+        let slice = &self.inner.as_ref()[self.start..self.end];
+        // Safety: elements in [start, end) are initialized
+        unsafe { &*(slice as *const [MaybeUninit<V>] as *const [V]) }
+    }
+
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut [V] {
+        let slice = &mut self.inner.as_mut()[self.start..self.end];
+        // Safety: elements in [start, end) are initialized
+        unsafe { &mut *(slice as *mut [MaybeUninit<V>] as *mut [V]) }
+    }
+}
+
 impl<K: DictKey, V> From<RequiredDict<K, V>> for IntoIter<K, V> {
     #[inline]
     fn from(dict: RequiredDict<K, V>) -> Self {
         let len = dict.inner.as_ref().len();
-        // SAFETY: `K::Array<V>` is effectively `[V; N]`, and `[V; N]` has the same layout as `[MaybeUninit<V>; N]`.
+        // Safety: `K::Array<V>` is effectively `[V; N]`, and `[V; N]` has the same layout as `[MaybeUninit<V>; N]`.
         let inner = ManuallyDrop::new(dict.inner);
         let ptr = &*inner as *const K::Array<V> as *const K::Array<MaybeUninit<V>>;
         let inner = unsafe { ptr.read() };
@@ -293,9 +309,23 @@ impl<K: DictKey, V> Drop for IntoIter<K, V> {
         // Drop remaining elements that haven't been yielded
         for i in self.start..self.end {
             // Safety: elements in [start, end) are still initialized
-            unsafe {
-                self.inner.as_mut()[i].assume_init_drop();
-            }
+            unsafe { self.inner.as_mut()[i].assume_init_drop() }
+        }
+    }
+}
+
+impl<K: DictKey, V: Clone> Clone for IntoIter<K, V> {
+    fn clone(&self) -> Self {
+        let mut inner: K::Array<MaybeUninit<V>> = Array::from_fn(|_| MaybeUninit::uninit());
+        for i in self.start..self.end {
+            // Safety: elements in [start, end) are initialized
+            let value = unsafe { self.inner.as_ref()[i].assume_init_ref() };
+            inner.as_mut()[i] = MaybeUninit::new(value.clone());
+        }
+        Self {
+            inner,
+            start: self.start,
+            end: self.end,
         }
     }
 }
@@ -448,7 +478,7 @@ impl<K: DictKey, V> RequiredDict<K, MaybeUninit<V>> {
     /// Transpose `RequiredDict<K, MaybeUninit<V>>` into `MaybeUninit<RequiredDict<K, V>>`.
     #[inline]
     pub fn transpose(self) -> MaybeUninit<RequiredDict<K, V>> {
-        // SAFETY: `MaybeUninit<RequiredDict<K, V>>` and `RequiredDict<K, MaybeUninit<V>>`
+        // Safety: `MaybeUninit<RequiredDict<K, V>>` and `RequiredDict<K, MaybeUninit<V>>`
         // have the same layout because:
         // 1. `RequiredDict<K, V>` is `#[repr(transparent)]` over `K::Array<V>`
         // 2. `K::Array<V>` is effectively `[V; N]`
