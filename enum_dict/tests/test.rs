@@ -70,7 +70,7 @@ fn test_macro() {
         Key::A | Key::B => 20,
     };
     let dict_2: RequiredDict<Key, _> = required_dict! {
-        Key::A => 20,
+        | Key::A => 20,
         _ => 20,
     };
     assert_eq!(dict_1, dict_2);

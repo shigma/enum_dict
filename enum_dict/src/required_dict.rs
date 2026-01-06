@@ -293,7 +293,7 @@ impl<K: DictKey, V> RequiredDict<K, MaybeUninit<V>> {
 
 #[macro_export]
 macro_rules! required_dict {
-    ($($head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr),* $(,)?) => {{
+    ($($(|)? $head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr),* $(,)?) => {{
         // Compile-time exhaustiveness check
         let _ = |key: _| match key {
             $(
@@ -313,7 +313,7 @@ macro_rules! required_dict {
         unsafe { dict.transpose().assume_init() }
     }};
 
-    ($($head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr,)* _ => $default:expr $(,)?) => {{
+    ($($(|)? $head:ident $(::$tail:ident)* $(|$or_head:ident $(::$or_tail:ident)*)* => $value:expr,)* _ => $default:expr $(,)?) => {{
         let mut dict = $crate::RequiredDict::from_fn(|_| $default);
         $(
             dict[$head $(::$tail)*] = $value;
