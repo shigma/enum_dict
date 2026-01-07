@@ -224,22 +224,6 @@ pub struct IntoIter<K: DictKey, V> {
     end: usize,
 }
 
-impl<K: DictKey, V> IntoIter<K, V> {
-    #[inline]
-    pub fn as_slice(&self) -> &[V] {
-        let slice = &self.inner.as_ref()[self.start..self.end];
-        // Safety: elements in [start, end) are initialized
-        unsafe { &*(slice as *const [MaybeUninit<V>] as *const [V]) }
-    }
-
-    #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [V] {
-        let slice = &mut self.inner.as_mut()[self.start..self.end];
-        // Safety: elements in [start, end) are initialized
-        unsafe { &mut *(slice as *mut [MaybeUninit<V>] as *mut [V]) }
-    }
-}
-
 impl<K: DictKey, V> From<RequiredDict<K, V>> for IntoIter<K, V> {
     #[inline]
     fn from(dict: RequiredDict<K, V>) -> Self {
